@@ -44,6 +44,18 @@ export const signUp = async (
   lastName: string
 ): Promise<{ message: string }> => {
   try {
+    // First check if user exists
+    const { data: existingUser } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingUser) {
+      throw new Error('User already registered');
+    }
+
+    // Create the user
     const { data: { user }, error } = await supabase.auth.signUp({
       email,
       password,
@@ -67,6 +79,7 @@ export const signUp = async (
             user_id: user.id,
             first_name: firstName,
             last_name: lastName,
+            email: email,
             status: UserStatus.PENDING
           }
         ]);
@@ -95,14 +108,14 @@ export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
     const { data: profiles, error } = await supabase
       .from('user_profiles')
-      .select('user_id, first_name, last_name, status, created_at, users!inner(email)')
+      .select('*')
       .eq('status', UserStatus.PENDING);
 
     if (error) throw error;
 
     return profiles.map(profile => ({
       id: profile.user_id,
-      email: profile.users.email,
+      email: profile.email,
       firstName: profile.first_name,
       lastName: profile.last_name,
       createdAt: profile.created_at,
@@ -119,7 +132,7 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
     // Get the user's profile
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name, users!inner(email)')
+      .select('first_name, email')
       .eq('user_id', userId)
       .single();
 
@@ -142,7 +155,7 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
     // Send approval email
     await sendEmail(
       'approval',
-      profile.users.email,
+      profile.email,
       profile.first_name
     );
 
@@ -167,7 +180,7 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
     // Get the user's profile
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name, users!inner(email)')
+      .select('first_name, email')
       .eq('user_id', userId)
       .single();
 
@@ -190,7 +203,7 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
     // Send rejection email
     await sendEmail(
       'rejection',
-      profile.users.email,
+      profile.email,
       profile.first_name
     );
 
