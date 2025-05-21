@@ -38,12 +38,6 @@ const LoginForm = () => {
   
   return (
     <div className="space-y-6">
-      <div className="text-center mb-6">
-        <p className="text-sm text-gray-500 mb-4">
-          Sign in with your admin credentials
-        </p>
-      </div>
-      
       <form onSubmit={handleLogin} className="space-y-4">
         <FormErrorAlert error={error} />
         
@@ -52,7 +46,7 @@ const LoginForm = () => {
           <Input
             id="email"
             type="text"
-            placeholder="admin@example.com"
+            placeholder="your.email@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -78,15 +72,6 @@ const LoginForm = () => {
         >
           {isLoading ? "Logging in..." : "Sign In"}
         </Button>
-        
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            Default admin: admin@example.com / adminpassword
-          </p>
-          <p className="text-xs text-gray-500">
-            Alternative: admin / admin123
-          </p>
-        </div>
       </form>
     </div>
   );

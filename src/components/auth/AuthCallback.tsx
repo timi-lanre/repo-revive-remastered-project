@@ -13,7 +13,17 @@ const AuthCallback = () => {
       try {
         setIsProcessing(true);
         
-        // Since we're not using OIDC anymore, we'll simply check if the user is authenticated
+        // Get token from URL if present (for OAuth flow)
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        
+        // If there's a code parameter, we're in an OAuth flow
+        if (code) {
+          // Exchange code for token - implement this in your auth service if needed
+          // await authService.exchangeCodeForToken(code);
+        }
+        
+        // Check if the user is authenticated
         const isAuthenticated = await authService.isAuthenticated();
         
         if (isAuthenticated) {
