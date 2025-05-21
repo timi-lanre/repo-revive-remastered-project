@@ -1,4 +1,4 @@
-import { SmtpClient } from "npm:@orama/smtp-client";
+import { SmtpClient } from "jsr:@smtp/client";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const smtpClient = new SmtpClient({
-  host: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+  hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
   port: 587,
   username: Deno.env.get("SMTP_USERNAME"),
   password: Deno.env.get("SMTP_PASSWORD"),
@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
     await smtpClient.send({
       from: Deno.env.get("SMTP_FROM") || "noreply@advisorconnect.com",
-      to: email,
+      to: [email],
       subject: subject,
       content: body,
     });
