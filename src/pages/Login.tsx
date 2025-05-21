@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,14 +19,15 @@ const loginSchema = z.object({
   rememberMe: z.boolean().optional(),
 });
 
+// Modified the acceptTerms to be boolean with custom validation instead of literal(true)
 const signupSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
   lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
   confirmPassword: z.string(),
-  acceptTerms: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms and conditions" }),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "You must accept the terms and conditions",
   }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
@@ -59,7 +59,7 @@ const Login = () => {
       email: "",
       password: "",
       confirmPassword: "",
-      acceptTerms: false, // This should be false by default, we'll modify the validation below
+      acceptTerms: false, // Now this is valid as we're using boolean with refine
     },
   });
 
