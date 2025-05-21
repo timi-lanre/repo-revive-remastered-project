@@ -1,8 +1,7 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import { authService } from "@/services/authService";
+import { authService } from "@/services/auth";
 
 const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);

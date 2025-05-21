@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { authService, PendingUser } from "@/services/authService";
+import { authService, PendingUser } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
 import { UserCheck, UserX } from "lucide-react";
 

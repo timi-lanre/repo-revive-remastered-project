@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form } from "@/components/ui/form";
-import { authService } from "@/services/authService";
+import { authService } from "@/services/auth";
 import SignupFormFields, { SignupFormValues } from "./SignupFormFields";
 import FormErrorAlert from "./FormErrorAlert";
 import SubmitButton from "./SubmitButton";
