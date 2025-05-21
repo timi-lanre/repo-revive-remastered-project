@@ -43,65 +43,38 @@ export const signUp = async (
   firstName: string, 
   lastName: string
 ): Promise<{ message: string }> => {
-  try {
-    // First check if user exists
-    const { data: existingUser } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (existingUser) {
-      throw new Error('User already registered');
+  // Create the user - Supabase Auth handles duplicate email validation
+  const { data: { user }, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        status: UserStatus.PENDING
+      }
     }
+  });
 
-    // Create the user
-    const { data: { user }, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
+  if (error) throw error;
+
+  if (user) {
+    // Create user profile
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .insert([
+        {
+          user_id: user.id,
           first_name: firstName,
           last_name: lastName,
           status: UserStatus.PENDING
         }
-      }
-    });
+      ]);
 
-    if (error) throw error;
-
-    if (user) {
-      // Create user profile
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([
-          {
-            user_id: user.id,
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            status: UserStatus.PENDING
-          }
-        ]);
-
-      if (profileError) throw profileError;
-    }
-
-    toast({
-      title: "Account Request Submitted",
-      description: "Your account has been created and is pending admin approval. You will receive an email once your account is approved."
-    });
-    
-    return { message: "User registration request submitted successfully" };
-  } catch (error: any) {
-    console.error('Error during registration:', error);
-    toast({
-      title: "Registration Failed",
-      description: error.message || "There was an error during registration.",
-      variant: "destructive"
-    });
-    throw error;
+    if (profileError) throw profileError;
   }
+
+  return { message: "User registration request submitted successfully" };
 };
 
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
@@ -132,11 +105,15 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
     // Get the user's profile
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name, email')
+      .select('first_name')
       .eq('user_id', userId)
       .single();
 
     if (!profile) throw new Error('User not found');
+
+    // Get user email from auth.users
+    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(userId);
+    if (userError || !user) throw new Error('User not found in auth system');
 
     // Update the user's status through an Edge Function
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-user`, {
@@ -155,7 +132,7 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
     // Send approval email
     await sendEmail(
       'approval',
-      profile.email,
+      user.email,
       profile.first_name
     );
 
@@ -180,11 +157,15 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
     // Get the user's profile
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name, email')
+      .select('first_name')
       .eq('user_id', userId)
       .single();
 
     if (!profile) throw new Error('User not found');
+
+    // Get user email from auth.users
+    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(userId);
+    if (userError || !user) throw new Error('User not found in auth system');
 
     // Reject the user through an Edge Function
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reject-user`, {
@@ -203,7 +184,7 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
     // Send rejection email
     await sendEmail(
       'rejection',
-      profile.email,
+      user.email,
       profile.first_name
     );
 

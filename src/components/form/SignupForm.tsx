@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { z } from "zod";
@@ -46,21 +45,25 @@ const SignupForm = () => {
     setSignupError(null);
     
     try {
-      const result = await authService.signUp(data.email, data.password, data.firstName, data.lastName);
+      await authService.signUp(data.email, data.password, data.firstName, data.lastName);
       
       toast({
         title: "Account Request Submitted",
-        description: result.message || "Your account has been created and is pending admin approval.",
+        description: "Your account has been created and is pending admin approval.",
       });
       
       // Reset the form after successful signup
       form.reset();
       
     } catch (error: any) {
-      setSignupError(error.message || "Signup failed. Please try again.");
+      const errorMessage = error.message === "User already registered" 
+        ? "An account with this email already exists. Please try logging in instead."
+        : error.message || "There was an error creating your account. Please try again.";
+      
+      setSignupError(errorMessage);
       toast({
         title: "Signup Failed",
-        description: error.message || "There was an error creating your account. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
