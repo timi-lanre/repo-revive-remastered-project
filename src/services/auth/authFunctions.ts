@@ -1,44 +1,64 @@
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
-import { signOut as amplifySignOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { signIn, signOut as amplifySignOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 
-// Initialize Amplify Auth with the Cognito configuration
-const initializeAuth = () => {
-  // Configuration now happens in main.tsx or App.tsx
-  // No need to call configure here anymore in Amplify v6+
-};
-
-// Call initialize on module import
-initializeAuth();
-
-// Get the Cognito Hosted UI sign-in URL
-const getCognitoSignInUrl = () => {
-  const queryParams = new URLSearchParams({
-    client_id: cognitoConfig.userPoolWebClientId,
-    response_type: 'code',
-    scope: 'email openid profile',
-    redirect_uri: cognitoConfig.redirectUri
-  });
-
-  return `https://${cognitoConfig.oauth.domain}/login?${queryParams.toString()}`;
-};
-
-// Production-ready login with email and password using Cognito Hosted UI
+// Production-ready login with email and password using Amplify Auth
 export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
   try {
-    if (!cognitoConfig.oauth.domain) {
-      throw new Error('Cognito OAuth domain is not configured');
+    // Sign in using Amplify Auth
+    const signInResult = await signIn({
+      username: email,
+      password: password,
+      options: {
+        clientMetadata: {
+          jwksUri: cognitoConfig.jwksUri
+        }
+      }
+    });
+    
+    if (signInResult.isSignedIn) {
+      try {
+        // Get the current session to access tokens and user info
+        const session = await fetchAuthSession();
+        const user = await getCurrentUser();
+        
+        // Extract groups from the ID token
+        const groups = session.tokens?.idToken?.payload['cognito:groups'] || [];
+        
+        // Store user info for our app's usage
+        const userInfo = {
+          sub: user.userId,
+          email: email,
+          name: email,
+          "cognito:groups": groups
+        };
+        
+        localStorage.setItem("user_info", JSON.stringify(userInfo));
+        
+        toast({
+          title: "Login Successful",
+          description: "You've been successfully logged in."
+        });
+        
+        return { success: true };
+      } catch (err) {
+        console.error("Error getting user details:", err);
+        throw err;
+      }
     }
     
-    // Redirect to Cognito Hosted UI
-    window.location.href = getCognitoSignInUrl();
-    return { success: true };
+    throw new Error("Login failed");
   } catch (error: any) {
     console.error('Error during login:', error);
     
+    let errorMessage = "There was an error during login.";
+    if (error.message) {
+      errorMessage = error.message;
+    }
+    
     toast({
       title: "Login Failed",
-      description: "There was an error during login. Please try again.",
+      description: errorMessage,
       variant: "destructive"
     });
     

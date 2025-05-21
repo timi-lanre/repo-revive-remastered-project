@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,9 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./components/auth/AuthCallback";
-import { useEffect } from "react";
-import { cognitoConfig } from "./config/cognito";
 import { Amplify } from "aws-amplify";
+import { cognitoConfig } from "./config/cognito";
 
 const queryClient = new QueryClient();
 
@@ -22,7 +20,8 @@ Amplify.configure({
     Cognito: {
       userPoolId: cognitoConfig.userPoolId,
       userPoolClientId: cognitoConfig.userPoolWebClientId,
-      region: cognitoConfig.region
+      region: cognitoConfig.region,
+      signUpVerificationMethod: 'code'
     }
   }
 });
@@ -39,7 +38,6 @@ const App = () => (
           <Route path="/callback" element={<AuthCallback />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin" element={<Admin />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
