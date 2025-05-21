@@ -46,7 +46,7 @@ const Admin = () => {
       // Transform the profiles into the required format
       const usersWithEmail = profiles.map(profile => ({
         id: profile.user_id,
-        email: profile.email || 'No email available', // Email should be stored in user_profiles
+        email: profile.email,
         firstName: profile.first_name,
         lastName: profile.last_name,
         status: profile.status,
