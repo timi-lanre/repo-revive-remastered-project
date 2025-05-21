@@ -7,10 +7,10 @@ export const getCurrentUser = async () => {
     
     if (!user) return null;
 
-    // Get user profile with role
+    // Get user profile with specific columns
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('*')
+      .select('id, user_id, first_name, last_name, role, status')
       .eq('user_id', user.id)
       .single();
 

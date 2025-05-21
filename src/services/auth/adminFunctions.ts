@@ -45,13 +45,7 @@ export const signUp = async (
 ): Promise<{ message: string }> => {
   try {
     // First check if a user with this email already exists
-    const { data: existingUser, error: lookupError } = await supabase
-      .from('user_profiles')
-      .select('users!inner(email)')
-      .eq('users.email', email)
-      .maybeSingle();
-
-    if (lookupError) throw lookupError;
+    const { data: { user: existingUser } } = await supabase.auth.admin.getUserByEmail(email);
     
     if (existingUser) {
       throw new Error('An account with this email already exists. Please use a different email or try logging in.');
@@ -106,29 +100,37 @@ export const signUp = async (
 
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
+    // First get all pending profiles
     const { data: profiles, error } = await supabase
       .from('user_profiles')
-      .select(`
-        id,
-        user_id,
-        first_name,
-        last_name,
-        status,
-        created_at,
-        users:user_id (email)
-      `)
+      .select('user_id, first_name, last_name, status, created_at')
       .eq('status', UserStatus.PENDING);
 
     if (error) throw error;
 
-    return profiles.map(profile => ({
-      id: profile.user_id,
-      email: profile.users.email,
-      firstName: profile.first_name,
-      lastName: profile.last_name,
-      createdAt: profile.created_at,
-      status: profile.status
-    }));
+    // Get user emails from auth.users
+    const pendingUsers = await Promise.all(
+      profiles.map(async (profile) => {
+        const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(profile.user_id);
+        
+        if (userError) {
+          console.error(`Error fetching user ${profile.user_id}:`, userError);
+          return null;
+        }
+
+        return {
+          id: profile.user_id,
+          email: user?.email || '',
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          createdAt: profile.created_at,
+          status: profile.status as UserStatus
+        };
+      })
+    );
+
+    // Filter out any null values from failed user lookups
+    return pendingUsers.filter((user): user is PendingUser => user !== null);
   } catch (error) {
     console.error("Error fetching pending users:", error);
     return [];
@@ -138,13 +140,15 @@ export const getPendingUsers = async (): Promise<PendingUser[]> => {
 export const approveUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
     // First get the user's details for the email
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name, users!inner(email)')
+      .select('first_name')
       .eq('user_id', userId)
       .single();
 
-    if (profileError) throw profileError;
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+
+    if (!profile || !user) throw new Error('User not found');
 
     // Update the user's status
     const { error } = await supabase
@@ -157,7 +161,7 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
     // Send approval email
     await sendEmail(
       'approval',
-      profile.users.email,
+      user.email || '',
       profile.first_name
     );
 
@@ -180,13 +184,15 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
 export const rejectUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
     // First get the user's details for the email
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name, users!inner(email)')
+      .select('first_name')
       .eq('user_id', userId)
       .single();
 
-    if (profileError) throw profileError;
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+
+    if (!profile || !user) throw new Error('User not found');
 
     // Update status to rejected
     const { error: updateError } = await supabase
@@ -199,7 +205,7 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
     // Send rejection email
     await sendEmail(
       'rejection',
-      profile.users.email,
+      user.email || '',
       profile.first_name
     );
 
