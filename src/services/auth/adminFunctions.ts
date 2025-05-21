@@ -84,6 +84,35 @@ export const signUp = async (
   }
 };
 
+export const deleteUser = async (email: string): Promise<void> => {
+  try {
+    // First get the user by email
+    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+    if (listError) throw listError;
+
+    const userToDelete = users.find(u => u.email === email);
+    if (!userToDelete) {
+      throw new Error('User not found');
+    }
+
+    // Delete from auth.users
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(
+      userToDelete.id
+    );
+    if (deleteError) throw deleteError;
+
+    // Also delete from user_profiles if it exists
+    await supabase
+      .from('user_profiles')
+      .delete()
+      .eq('user_id', userToDelete.id);
+
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
+    throw error;
+  }
+};
+
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
     const { data: profiles, error } = await supabase
