@@ -1,6 +1,6 @@
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
-import { signIn, signOut as amplifySignOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { signIn, signOut as amplifySignOut, getCurrentUser, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 
 // Initialize Amplify Auth with the Cognito configuration
 const initializeAuth = () => {
@@ -19,6 +19,31 @@ export const loginWithEmailPassword = async (email: string, password: string): P
       username: email,
       password: password,
     });
+    
+    // Handle force change password challenge
+    if (signInResult.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD') {
+      // Show toast to inform user they need to change password
+      toast({
+        title: "Password Change Required",
+        description: "Please set a new password for your account.",
+      });
+      
+      // Prompt user for new password
+      const newPassword = prompt("Please enter a new password (minimum 8 characters):");
+      
+      if (!newPassword) {
+        throw new Error("New password is required");
+      }
+      
+      // Confirm sign in with new password
+      const confirmResult = await confirmSignIn({
+        challengeResponse: newPassword,
+      });
+      
+      if (!confirmResult.isSignedIn) {
+        throw new Error("Failed to change password");
+      }
+    }
     
     if (signInResult.isSignedIn) {
       try {
