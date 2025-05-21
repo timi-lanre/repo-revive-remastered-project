@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -48,15 +49,25 @@ const LoginForm = () => {
           title: "Account Pending Approval",
           description: "Your account is still pending admin approval.",
         });
+        setIsLoading(false);
         return;
       }
       
-      // If we made it here, the sign-in was successful
+      // Check if the user is an admin
+      const isAdmin = await authService.isAdmin();
+      
+      // Success toast
       toast({
         title: "Login Successful",
-        description: "Redirecting to dashboard...",
+        description: isAdmin 
+          ? "Redirecting to admin dashboard..." 
+          : "Redirecting to dashboard...",
       });
-      setTimeout(() => { navigate("/dashboard"); }, 1500);
+      
+      // Redirect based on user role
+      setTimeout(() => {
+        navigate(isAdmin ? "/admin" : "/dashboard");
+      }, 1500);
       
     } catch (error: any) {
       setLoginError(error.message || "Login failed. Please try again.");
@@ -65,7 +76,6 @@ const LoginForm = () => {
         description: error.message || "Please check your credentials and try again.",
         variant: "destructive"
       });
-    } finally {
       setIsLoading(false);
     }
   };

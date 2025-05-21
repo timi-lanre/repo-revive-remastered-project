@@ -9,6 +9,14 @@ export enum UserStatus {
   REJECTED = "REJECTED"
 }
 
+export interface PendingUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  createdAt: string;
+}
+
 export const authService = {
   // Sign in function
   signIn: async (email: string, password: string) => {
@@ -53,8 +61,20 @@ export const authService = {
         },
       });
       
-      // Simulate sending an approval email to admin (in real app, this would be a backend call)
-      console.log(`[ADMIN NOTIFICATION] New user registration: ${email}, ${firstName} ${lastName} needs approval`);
+      // In a production environment, you would send an email to the admin
+      // For now, we'll store the pending user in localStorage for demo purposes
+      const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
+      
+      const newUser = {
+        id: Date.now().toString(), // Generate a temporary ID
+        email,
+        firstName,
+        lastName,
+        createdAt: new Date().toISOString(),
+      };
+      
+      pendingUsers.push(newUser);
+      localStorage.setItem('pendingUsers', JSON.stringify(pendingUsers));
       
       return { 
         nextStep,
@@ -96,20 +116,53 @@ export const authService = {
     }
   },
   
-  // FOR TESTING: Simulate admin approval flow
-  // In a real application, this would be a secured admin endpoint
-  simulateAdminApproval: async (email: string) => {
-    // In a real implementation, this would make API calls to AWS Cognito Admin APIs
-    // to confirm the user and change their status
+  // Check if user is an admin
+  isAdmin: async () => {
+    try {
+      const user = await getCurrentUser();
+      // In a real implementation, you would have a proper admin group or role
+      // For this demo, we'll consider a specific email as the admin
+      return user.username === "admin@example.com";
+    } catch {
+      return false;
+    }
+  },
+  
+  // Get pending users (in a real app, this would call Cognito admin APIs)
+  getPendingUsers: () => {
+    const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
+    return pendingUsers as PendingUser[];
+  },
+  
+  // Approve user
+  approveUser: (userId: string) => {
+    // In a real implementation, this would use Cognito Admin APIs to confirm the user
+    // For demo purposes, we'll just remove from our pendingUsers list
+    const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
+    const updatedUsers = pendingUsers.filter((user: PendingUser) => user.id !== userId);
+    localStorage.setItem('pendingUsers', JSON.stringify(updatedUsers));
     
     toast({
-      title: "Admin Approval Simulated",
-      description: `User ${email} would be approved in a real implementation.`,
+      title: "User Approved",
+      description: "The user has been approved and can now log in.",
     });
     
-    return {
-      success: true,
-      message: `In a production environment, ${email} would now be approved and able to log in.`
-    };
+    return { success: true };
+  },
+  
+  // Reject user
+  rejectUser: (userId: string) => {
+    // In a real implementation, this would use Cognito Admin APIs to delete the user
+    // For demo purposes, we'll just remove from our pendingUsers list
+    const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
+    const updatedUsers = pendingUsers.filter((user: PendingUser) => user.id !== userId);
+    localStorage.setItem('pendingUsers', JSON.stringify(updatedUsers));
+    
+    toast({
+      title: "User Rejected",
+      description: "The user has been rejected.",
+    });
+    
+    return { success: true };
   }
 };
