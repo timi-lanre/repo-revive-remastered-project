@@ -44,6 +44,19 @@ export const signUp = async (
   lastName: string
 ): Promise<{ message: string }> => {
   try {
+    // First check if a user with this email already exists
+    const { data: existingUser, error: lookupError } = await supabase
+      .from('user_profiles')
+      .select('users!inner(email)')
+      .eq('users.email', email)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+    
+    if (existingUser) {
+      throw new Error('An account with this email already exists. Please use a different email or try logging in.');
+    }
+
     const { data: { user }, error } = await supabase.auth.signUp({
       email,
       password,
