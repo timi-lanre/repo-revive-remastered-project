@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { z } from "zod";
@@ -10,7 +9,6 @@ import SignupFormFields, { SignupFormValues } from "./SignupFormFields";
 import FormErrorAlert from "./FormErrorAlert";
 import SubmitButton from "./SubmitButton";
 import FormDisclaimer from "./FormDisclaimer";
-import { supabase } from "@/lib/supabase";
 
 const signupSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
@@ -47,31 +45,7 @@ const SignupForm = () => {
     setSignupError(null);
     
     try {
-      // First check if the email already exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from('user_profiles')
-        .select('email')
-        .eq('email', data.email)
-        .maybeSingle();
-      
-      if (checkError) {
-        console.error("Error checking existing user:", checkError);
-      }
-      
-      // Also check in auth.users through our function to be thorough
-      const { data: { users }, error: authCheckError } = await supabase.auth.admin.listUsers({
-        filter: `email eq ${data.email}`,
-      });
-      
-      if (authCheckError) {
-        console.error("Error checking auth users:", authCheckError);
-      }
-      
-      if (existingUser || (users && users.length > 0)) {
-        throw new Error("User already registered");
-      }
-      
-      // Proceed with signup if email doesn't exist
+      // Proceed with signup
       await authService.signUp(data.email, data.password, data.firstName, data.lastName);
       
       toast({
@@ -83,9 +57,7 @@ const SignupForm = () => {
       form.reset();
       
     } catch (error: any) {
-      const errorMessage = error.message === "User already registered" 
-        ? "An account with this email already exists. Please try logging in instead."
-        : error.message || "There was an error creating your account. Please try again.";
+      const errorMessage = error.message || "There was an error creating your account. Please try again.";
       
       setSignupError(errorMessage);
       toast({

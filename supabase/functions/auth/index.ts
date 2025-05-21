@@ -1,4 +1,4 @@
-import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, ListUsersCommand, AdminUpdateUserAttributesCommand, AdminAddUserToGroupCommand, AdminDeleteUserCommand } from "npm:@aws-sdk/client-cognito-identity-provider";
+import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,13 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-const cognitoClient = new CognitoIdentityProviderClient({
-  region: Deno.env.get("COGNITO_REGION"),
-  credentials: {
-    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
-    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
-  },
-});
+// Initialize Supabase client with service role key
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL") || "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
+);
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -31,31 +35,49 @@ Deno.serve(async (req) => {
     if (path === "/signup" && req.method === "POST") {
       const { email, password, firstName, lastName } = await req.json();
 
-      const createUserCommand = new AdminCreateUserCommand({
-        UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
-        Username: email,
-        TemporaryPassword: password,
-        UserAttributes: [
-          { Name: "email", Value: email },
-          { Name: "given_name", Value: firstName },
-          { Name: "family_name", Value: lastName },
-          { Name: "custom:status", Value: "PENDING" },
-          { Name: "email_verified", Value: "true" }, // Auto-verify email
-        ],
-        MessageAction: "SUPPRESS", // Suppress welcome email
+      // First check if user exists
+      const { data: existingUser } = await supabase
+        .from('user_profiles')
+        .select('user_id')
+        .eq('user_id', email)
+        .maybeSingle();
+
+      if (existingUser) {
+        throw new Error("User already exists");
+      }
+
+      // Create auth user
+      const { data: { user }, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+        },
       });
 
-      await cognitoClient.send(createUserCommand);
+      if (authError) throw authError;
+      if (!user) throw new Error("Failed to create user");
 
-      // Set permanent password
-      const setPasswordCommand = new AdminSetUserPasswordCommand({
-        UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
-        Username: email,
-        Password: password,
-        Permanent: true,
-      });
+      // Create user profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            user_id: user.id,
+            first_name: firstName,
+            last_name: lastName,
+            status: "PENDING",
+            role: "user"
+          }
+        ]);
 
-      await cognitoClient.send(setPasswordCommand);
+      if (profileError) {
+        // Rollback: delete auth user if profile creation fails
+        await supabase.auth.admin.deleteUser(user.id);
+        throw profileError;
+      }
 
       return new Response(
         JSON.stringify({ message: "User created successfully" }),
@@ -68,23 +90,28 @@ Deno.serve(async (req) => {
 
     // Get pending users endpoint
     if (path === "/pending-users" && req.method === "GET") {
-      const listUsersCommand = new ListUsersCommand({
-        UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
-        Filter: 'custom:status = "PENDING"',
-      });
+      const { data: profiles, error } = await supabase
+        .from('user_profiles')
+        .select('user_id, first_name, last_name, status, created_at')
+        .eq('status', 'PENDING');
 
-      const { Users } = await cognitoClient.send(listUsersCommand);
-      
-      const pendingUsers = Users?.map(user => ({
-        id: user.Username,
-        email: user.Attributes?.find(attr => attr.Name === "email")?.Value,
-        firstName: user.Attributes?.find(attr => attr.Name === "given_name")?.Value,
-        lastName: user.Attributes?.find(attr => attr.Name === "family_name")?.Value,
-        createdAt: user.UserCreateDate,
-        status: "PENDING"
-      })) || [];
+      if (error) throw error;
 
-      return new Response(JSON.stringify(pendingUsers), {
+      const users = await Promise.all(
+        profiles.map(async (profile) => {
+          const { data: { user } } = await supabase.auth.admin.getUserById(profile.user_id);
+          return {
+            id: profile.user_id,
+            email: user?.email || 'No email available',
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            createdAt: profile.created_at,
+            status: profile.status
+          };
+        })
+      );
+
+      return new Response(JSON.stringify(users), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -94,25 +121,12 @@ Deno.serve(async (req) => {
     if (path.startsWith("/approve-user/") && req.method === "POST") {
       const userId = path.split("/").pop();
       
-      // Update user status
-      const updateAttributesCommand = new AdminUpdateUserAttributesCommand({
-        UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
-        Username: userId,
-        UserAttributes: [
-          { Name: "custom:status", Value: "APPROVED" }
-        ],
-      });
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ status: "APPROVED" })
+        .eq('user_id', userId);
 
-      await cognitoClient.send(updateAttributesCommand);
-
-      // Add user to approved group
-      const addToGroupCommand = new AdminAddUserToGroupCommand({
-        UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
-        Username: userId,
-        GroupName: "Users"
-      });
-
-      await cognitoClient.send(addToGroupCommand);
+      if (updateError) throw updateError;
 
       return new Response(
         JSON.stringify({ message: "User approved successfully" }),
@@ -126,13 +140,14 @@ Deno.serve(async (req) => {
     // Reject user endpoint
     if (path.startsWith("/reject-user/") && req.method === "POST") {
       const userId = path.split("/").pop();
-      
-      const deleteUserCommand = new AdminDeleteUserCommand({
-        UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
-        Username: userId,
-      });
 
-      await cognitoClient.send(deleteUserCommand);
+      // Update profile status
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ status: "REJECTED" })
+        .eq('user_id', userId);
+
+      if (updateError) throw updateError;
 
       return new Response(
         JSON.stringify({ message: "User rejected successfully" }),
