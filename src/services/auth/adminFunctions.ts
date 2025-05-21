@@ -16,6 +16,27 @@ export interface PendingUser {
   status: UserStatus;
 }
 
+const sendEmail = async (type: 'approval' | 'rejection', email: string, firstName: string) => {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ type, email, firstName }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send email notification');
+    }
+  } catch (error) {
+    console.error('Error sending email:', error);
+    // Don't throw the error - we don't want to block the approval/rejection process
+    // just because the email failed to send
+  }
+};
+
 export const signUp = async (
   email: string, 
   password: string, 
@@ -55,7 +76,7 @@ export const signUp = async (
 
     toast({
       title: "Account Request Submitted",
-      description: "Your account has been created and is pending admin approval."
+      description: "Your account has been created and is pending admin approval. You will receive an email once your account is approved."
     });
     
     return { message: "User registration request submitted successfully" };
@@ -103,6 +124,16 @@ export const getPendingUsers = async (): Promise<PendingUser[]> => {
 
 export const approveUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
+    // First get the user's details for the email
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('first_name, users!inner(email)')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError) throw profileError;
+
+    // Update the user's status
     const { error } = await supabase
       .from('user_profiles')
       .update({ status: UserStatus.APPROVED })
@@ -110,9 +141,16 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
 
     if (error) throw error;
 
+    // Send approval email
+    await sendEmail(
+      'approval',
+      profile.users.email,
+      profile.first_name
+    );
+
     toast({
       title: "User Approved",
-      description: "User has been successfully approved."
+      description: "User has been successfully approved and notified via email."
     });
     return { success: true };
   } catch (error: any) {
@@ -128,7 +166,16 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
 
 export const rejectUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    // First update the status
+    // First get the user's details for the email
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('first_name, users!inner(email)')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError) throw profileError;
+
+    // Update status to rejected
     const { error: updateError } = await supabase
       .from('user_profiles')
       .update({ status: UserStatus.REJECTED })
@@ -136,14 +183,21 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
 
     if (updateError) throw updateError;
 
-    // Then delete the user authentication
+    // Send rejection email
+    await sendEmail(
+      'rejection',
+      profile.users.email,
+      profile.first_name
+    );
+
+    // Delete the user's auth account
     const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
 
     if (deleteError) throw deleteError;
 
     toast({
       title: "User Rejected",
-      description: "User has been rejected and removed."
+      description: "User has been rejected and notified via email."
     });
     return { success: true };
   } catch (error: any) {
