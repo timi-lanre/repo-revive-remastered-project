@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
+import { SmtpClient } from "npm:smtp-client";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +18,27 @@ const supabase = createClient(
     },
   }
 );
+
+// Initialize SMTP client
+const smtpClient = new SmtpClient({
+  hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+  port: 587,
+  username: Deno.env.get("SMTP_USERNAME"),
+  password: Deno.env.get("SMTP_PASSWORD"),
+});
+
+async function sendEmail(to: string, subject: string, body: string) {
+  try {
+    await smtpClient.send({
+      from: Deno.env.get("SMTP_FROM") || "noreply@advisorconnect.com",
+      to: [to],
+      subject,
+      content: body,
+    });
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -128,6 +150,23 @@ Deno.serve(async (req) => {
 
       if (updateError) throw updateError;
 
+      // Get user details for email
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('first_name')
+        .eq('user_id', userId)
+        .single();
+
+      const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+
+      if (profile && user?.email) {
+        await sendEmail(
+          user.email,
+          "Your Advisor Connect Account Has Been Approved",
+          `Dear ${profile.first_name},\n\nYour account has been approved. You can now log in to Advisor Connect.\n\nBest regards,\nThe Advisor Connect Team`
+        );
+      }
+
       return new Response(
         JSON.stringify({ message: "User approved successfully" }),
         {
@@ -149,8 +188,45 @@ Deno.serve(async (req) => {
 
       if (updateError) throw updateError;
 
+      // Get user details for email
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('first_name')
+        .eq('user_id', userId)
+        .single();
+
+      const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+
+      if (profile && user?.email) {
+        await sendEmail(
+          user.email,
+          "Advisor Connect Account Status Update",
+          `Dear ${profile.first_name},\n\nWe regret to inform you that your account request has been rejected.\n\nBest regards,\nThe Advisor Connect Team`
+        );
+      }
+
       return new Response(
         JSON.stringify({ message: "User rejected successfully" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
+
+    // Reset password endpoint
+    if (path.startsWith("/reset-password/") && req.method === "POST") {
+      const userId = path.split("/").pop();
+      
+      const { error } = await supabase.auth.admin.generateLink({
+        type: 'recovery',
+        userId,
+      });
+
+      if (error) throw error;
+
+      return new Response(
+        JSON.stringify({ message: "Password reset email sent" }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,

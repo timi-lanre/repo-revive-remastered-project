@@ -6,45 +6,65 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { authService, PendingUser, UserStatus } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, UserX, RefreshCcw, LogOut } from "lucide-react";
+import { UserCheck, UserX, RefreshCcw, LogOut, Key } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
+
+interface UserProfile {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  role: string;
+  createdAt: string;
+}
 
 const Admin = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [users, setUsers] = useState<PendingUser[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
   const loadUsers = async () => {
     try {
-      console.log("Admin: Loading users...");
-      const users = await authService.getPendingUsers();
-      console.log("Admin: Users loaded:", users);
-      setUsers(users);
+      // Load pending users
+      const pendingUsers = await authService.getPendingUsers();
+      setUsers(pendingUsers);
       
-      // Additional direct database check for debugging
+      // Load all users
       const { data: profiles, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('status', 'PENDING');
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
       
-      if (error) {
-        console.error("Direct query error:", error);
-      } else {
-        console.log("Direct query results:", profiles);
-        if (profiles?.length !== users.length) {
-          console.warn("Discrepancy between service and direct query results");
-        }
-      }
+      const usersWithEmail = await Promise.all(
+        profiles.map(async (profile) => {
+          const { data: { user } } = await supabase.auth.admin.getUserById(profile.user_id);
+          return {
+            id: profile.user_id,
+            email: user?.email || 'No email available',
+            firstName: profile.first_name,
+            lastName: profile.last_name,
+            status: profile.status,
+            role: profile.role,
+            createdAt: profile.created_at
+          };
+        })
+      );
+      
+      setAllUsers(usersWithEmail);
     } catch (error: any) {
       console.error("Error loading users:", error);
-      setLoadingError(error.message || "Failed to load user requests");
+      setLoadingError(error.message || "Failed to load users");
       toast({
         title: "Error",
-        description: "Failed to load user requests. Please try refreshing.",
+        description: "Failed to load users. Please try refreshing.",
         variant: "destructive"
       });
     }
@@ -70,6 +90,23 @@ const Admin = () => {
       toast({
         title: "Error",
         description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleResetPassword = async (userId: string, email: string) => {
+    try {
+      await authService.resetPassword(userId);
+      toast({
+        title: "Success",
+        description: `Password reset email sent to ${email}`
+      });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reset password",
         variant: "destructive"
       });
     }
@@ -121,6 +158,7 @@ const Admin = () => {
       const result = await authService.approveUser(userId);
       if (result.success) {
         setUsers(users.filter(user => user.id !== userId));
+        await loadUsers(); // Reload all users to update the lists
         toast({
           title: "Success",
           description: "User has been approved successfully."
@@ -141,6 +179,7 @@ const Admin = () => {
       const result = await authService.rejectUser(userId);
       if (result.success) {
         setUsers(users.filter(user => user.id !== userId));
+        await loadUsers(); // Reload all users to update the lists
         toast({
           title: "Success",
           description: "User has been rejected successfully."
@@ -230,6 +269,7 @@ const Admin = () => {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="all">All Users</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
@@ -298,6 +338,60 @@ const Admin = () => {
                     </Table>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="all">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Users</CardTitle>
+                <CardDescription>
+                  Manage all registered users
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">
+                            {user.firstName} {user.lastName}
+                          </TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.status === 'APPROVED' ? 'default' : 'secondary'}>
+                              {user.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{user.role}</TableCell>
+                          <TableCell>{formatDate(user.createdAt)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleResetPassword(user.id, user.email)}
+                            >
+                              <Key className="h-4 w-4 mr-1" />
+                              Reset Password
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

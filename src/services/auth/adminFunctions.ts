@@ -122,6 +122,19 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
       throw new Error('Failed to approve user');
     }
 
+    // Get user details for email notification
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('first_name')
+      .eq('user_id', userId)
+      .single();
+
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+
+    if (profile && user?.email) {
+      await sendEmail('approval', user.email, profile.first_name);
+    }
+
     return { success: true };
   } catch (error: any) {
     console.error("Error approving user:", error);
@@ -142,9 +155,40 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
       throw new Error('Failed to reject user');
     }
 
+    // Get user details for email notification
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('first_name')
+      .eq('user_id', userId)
+      .single();
+
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+
+    if (profile && user?.email) {
+      await sendEmail('rejection', user.email, profile.first_name);
+    }
+
     return { success: true };
   } catch (error: any) {
     console.error("Error rejecting user:", error);
+    throw error;
+  }
+};
+
+export const resetPassword = async (userId: string): Promise<void> => {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/reset-password/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to trigger password reset');
+    }
+  } catch (error: any) {
+    console.error("Error resetting password:", error);
     throw error;
   }
 };
