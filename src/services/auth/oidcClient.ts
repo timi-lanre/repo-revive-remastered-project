@@ -22,7 +22,7 @@ export async function initializeOidcClient(): Promise<any> {
     return oidcClient;
   } catch (error) {
     console.error('Failed to initialize OIDC client:', error);
-    return null;
+    throw error; // Propagate error for better debugging
   }
 }
 
@@ -30,9 +30,6 @@ export async function initializeOidcClient(): Promise<any> {
 export async function getOidcClient(): Promise<any> {
   if (!oidcClient) {
     await initializeOidcClient();
-    if (!oidcClient) {
-      throw new Error('Failed to initialize OIDC client');
-    }
   }
   return oidcClient;
 }

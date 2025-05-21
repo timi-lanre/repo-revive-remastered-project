@@ -1,4 +1,3 @@
-
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
 import { getOidcClient, generateAuthParams } from './oidcClient';
@@ -7,6 +6,9 @@ import { getOidcClient, generateAuthParams } from './oidcClient';
 export const initiateLogin = async (): Promise<void> => {
   try {
     const oidcClient = await getOidcClient();
+    if (!oidcClient) {
+      throw new Error('Failed to initialize OIDC client');
+    }
     
     // Generate state and nonce for security
     const { state, nonce } = generateAuthParams();
@@ -28,7 +30,7 @@ export const initiateLogin = async (): Promise<void> => {
     console.error('Error starting login flow:', error);
     toast({
       title: "Login Failed",
-      description: error.message || "There was an error starting the login process.",
+      description: "Failed to initialize OIDC client. Please try again later.",
       variant: "destructive"
     });
     throw error;
