@@ -26,12 +26,14 @@ const Index = () => {
               Build your network and streamline your professional connections.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                className="bg-[#E5D3BC] text-black rounded-xl px-8 py-6 font-semibold text-base shadow-sm
-                  hover:bg-[#d6c3ac] hover:shadow-md hover:-translate-y-0.5 transition-all"
-              >
-                Get Started
-              </Button>
+              <Link to="/login">
+                <Button
+                  className="bg-[#E5D3BC] text-black rounded-xl px-8 py-6 font-semibold text-base shadow-sm
+                    hover:bg-[#d6c3ac] hover:shadow-md hover:-translate-y-0.5 transition-all"
+                >
+                  Get Started
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 className="border-black/10 text-[#1E293B] rounded-xl px-8 py-6 font-semibold text-base
@@ -95,12 +97,14 @@ const Index = () => {
           <p className="text-lg text-[#4B5563] mb-8 max-w-xl mx-auto">
             Access our comprehensive database of financial advisors and start building your professional network today.
           </p>
-          <Button
-            className="bg-white text-black rounded-xl px-8 py-6 font-semibold text-base shadow-sm
-              hover:bg-[#f9fafb] hover:shadow-md hover:-translate-y-0.5 transition-all"
-          >
-            Get Started
-          </Button>
+          <Link to="/login">
+            <Button
+              className="bg-white text-black rounded-xl px-8 py-6 font-semibold text-base shadow-sm
+                hover:bg-[#f9fafb] hover:shadow-md hover:-translate-y-0.5 transition-all"
+            >
+              Get Started
+            </Button>
+          </Link>
         </div>
       </div>
       
