@@ -2,7 +2,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
 import { 
   SESClient, 
   SendEmailCommand,
-  SendEmailCommandInput 
+  SendEmailCommandInput,
+  ListVerifiedEmailAddressesCommand 
 } from "npm:@aws-sdk/client-ses";
 
 const corsHeaders = {
@@ -30,10 +31,27 @@ const sesClient = new SESClient({
   },
 });
 
+async function isEmailVerified(email: string): Promise<boolean> {
+  try {
+    const command = new ListVerifiedEmailAddressesCommand({});
+    const response = await sesClient.send(command);
+    return response.VerifiedEmailAddresses?.includes(email) || false;
+  } catch (error) {
+    console.error("Error checking verified emails:", error);
+    return false;
+  }
+}
+
 async function sendEmail(to: string, subject: string, body: string) {
   try {
+    // Check if recipient email is verified (only in sandbox mode)
+    if (!await isEmailVerified(to)) {
+      console.warn(`Email ${to} is not verified in SES sandbox mode. Skipping email send.`);
+      return;
+    }
+
     const params: SendEmailCommandInput = {
-      Source: "noreply@advisorconnect.com",
+      Source: "noreply@advisorconnect.com", // Make sure this is verified
       Destination: {
         ToAddresses: [to],
       },
