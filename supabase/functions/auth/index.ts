@@ -9,7 +9,7 @@ import {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -32,41 +32,42 @@ const sesClient = new SESClient({
   },
 });
 
-async function isEmailVerified(email: string): Promise<boolean> {
-  // Skip verification check if SKIP_EMAIL_VERIFICATION is true
-  if (Deno.env.get("SKIP_EMAIL_VERIFICATION") === "true") {
+async function verifyEmailIdentity(email: string) {
+  try {
+    const command = new VerifyEmailIdentityCommand({ EmailAddress: email });
+    await sesClient.send(command);
+    console.log(`Verification email sent to ${email}`);
     return true;
+  } catch (error) {
+    console.error(`Error verifying email ${email}:`, error);
+    return false;
   }
+}
 
+async function isEmailVerified(email: string): Promise<boolean> {
   try {
     const command = new ListVerifiedEmailAddressesCommand({});
     const response = await sesClient.send(command);
-    
-    // If email isn't verified, attempt to verify it
-    if (!response.VerifiedEmailAddresses?.includes(email)) {
-      const verifyCommand = new VerifyEmailIdentityCommand({ EmailAddress: email });
-      await sesClient.send(verifyCommand);
-      console.log(`Verification email sent to ${email}`);
-    }
-    
-    return true; // Return true since we've initiated verification
+    return response.VerifiedEmailAddresses?.includes(email) || false;
   } catch (error) {
-    console.error("Error checking/verifying email:", error);
+    console.error("Error checking verified emails:", error);
     return false;
   }
 }
 
 async function sendEmail(to: string, subject: string, body: string) {
   try {
-    // Always verify sender email
-    const senderEmail = "advisorconnectdev@gmail.com";
-    await isEmailVerified(senderEmail);
-
-    // Attempt to verify recipient email
-    await isEmailVerified(to);
+    const fromEmail = Deno.env.get("AWS_SES_FROM_EMAIL") || "advisorconnectdev@gmail.com";
+    
+    // Check if recipient email is verified
+    if (!await isEmailVerified(to)) {
+      console.log(`Email ${to} not verified. Attempting verification...`);
+      await verifyEmailIdentity(to);
+      return; // Skip sending email until verified
+    }
 
     const params: SendEmailCommandInput = {
-      Source: senderEmail,
+      Source: fromEmail,
       Destination: {
         ToAddresses: [to],
       },
@@ -90,8 +91,10 @@ async function sendEmail(to: string, subject: string, body: string) {
 
     const command = new SendEmailCommand(params);
     await sesClient.send(command);
+    console.log(`Email sent successfully to ${to}`);
   } catch (error) {
     console.error("Error sending email:", error);
+    throw error;
   }
 }
 
