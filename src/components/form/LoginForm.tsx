@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import PasswordInput from "./PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { authService } from "@/services/authService";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -23,6 +24,8 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginForm = () => {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -33,49 +36,42 @@ const LoginForm = () => {
     },
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    console.log("Login data:", data);
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsLoading(true);
+    setLoginError(null);
     
-    // This is where you would integrate with AWS Cognito
-    // For example: Auth.signIn(data.email, data.password)
-    //   .then(user => {
-    //     if (user.challengeName === 'CUSTOM_CHALLENGE') {
-    //       toast({
-    //         title: "Account Pending Approval",
-    //         description: "Your account is still pending admin approval.",
-    //       });
-    //     } else {
-    //       toast({
-    //         title: "Login Successful",
-    //         description: "Redirecting to dashboard...",
-    //       });
-    //       setTimeout(() => { navigate("/dashboard"); }, 1500);
-    //     }
-    //   })
-    //   .catch(err => {
-    //     if (err.code === 'UserNotConfirmedException') {
-    //       toast({
-    //         title: "Account Pending Approval",
-    //         description: "Your account is still pending admin approval.",
-    //       });
-    //     } else {
-    //       toast({
-    //         title: "Login Failed",
-    //         description: err.message,
-    //         variant: "destructive"
-    //       });
-    //     }
-    //   });
-    
-    // Until AWS Cognito integration is complete, just simulate success
-    toast({
-      title: "Login Successful",
-      description: "Redirecting to dashboard...",
-    });
-    
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1500);
+    try {
+      const user = await authService.signIn(data.email, data.password);
+      
+      if (user.challengeName === 'CUSTOM_CHALLENGE') {
+        toast({
+          title: "Account Pending Approval",
+          description: "Your account is still pending admin approval.",
+        });
+      } else {
+        toast({
+          title: "Login Successful",
+          description: "Redirecting to dashboard...",
+        });
+        setTimeout(() => { navigate("/dashboard"); }, 1500);
+      }
+    } catch (error: any) {
+      if (error.code === 'UserNotConfirmedException') {
+        toast({
+          title: "Account Pending Approval",
+          description: "Your account is still pending admin approval.",
+        });
+      } else {
+        setLoginError(error.message || "Login failed. Please try again.");
+        toast({
+          title: "Login Failed",
+          description: error.message || "Please check your credentials and try again.",
+          variant: "destructive"
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -87,6 +83,13 @@ const LoginForm = () => {
             If your account is pending approval, you won't be able to log in until an administrator approves your registration.
           </AlertDescription>
         </Alert>
+        
+        {loginError && (
+          <Alert className="bg-red-50 border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">{loginError}</AlertDescription>
+          </Alert>
+        )}
         
         <FormField
           control={form.control}
@@ -100,6 +103,7 @@ const LoginForm = () => {
                   type="email" 
                   {...field} 
                   className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />
@@ -115,6 +119,7 @@ const LoginForm = () => {
               field={field}
               label="Password"
               showForgotPassword={true}
+              disabled={isLoading}
             />
           )}
         />
@@ -128,6 +133,7 @@ const LoginForm = () => {
                 <Checkbox
                   checked={field.value}
                   onCheckedChange={field.onChange}
+                  disabled={isLoading}
                 />
               </FormControl>
               <div className="space-y-1 leading-none">
@@ -139,8 +145,12 @@ const LoginForm = () => {
           )}
         />
         
-        <Button type="submit" className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
-          Sign in
+        <Button 
+          type="submit" 
+          className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+          disabled={isLoading}
+        >
+          {isLoading ? "Signing in..." : "Sign in"}
         </Button>
       </form>
     </Form>

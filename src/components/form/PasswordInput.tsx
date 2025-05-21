@@ -10,13 +10,15 @@ interface PasswordInputProps {
   label: string;
   placeholder?: string;
   showForgotPassword?: boolean;
+  disabled?: boolean;
 }
 
 const PasswordInput = ({
   field, 
   label, 
   placeholder = "••••••••", 
-  showForgotPassword = false
+  showForgotPassword = false,
+  disabled = false
 }: PasswordInputProps) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -41,11 +43,13 @@ const PasswordInput = ({
             placeholder={placeholder} 
             {...field} 
             className="pr-10 focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+            disabled={disabled}
           />
           <button 
             type="button" 
             className="absolute right-3 top-2.5 text-gray-500"
             onClick={togglePasswordVisibility}
+            disabled={disabled}
           >
             {showPassword ? (
               <EyeOff className="h-5 w-5" />

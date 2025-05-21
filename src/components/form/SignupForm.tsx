@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,6 +9,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import PasswordInput from "./PasswordInput";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { authService } from "@/services/authService";
 
 const signupSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
@@ -27,6 +30,9 @@ const signupSchema = z.object({
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 const SignupForm = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [signupError, setSignupError] = useState<string | null>(null);
+  
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -39,28 +45,43 @@ const SignupForm = () => {
     },
   });
 
-  const onSubmit = (data: SignupFormValues) => {
-    console.log("Signup data:", data);
+  const onSubmit = async (data: SignupFormValues) => {
+    setIsLoading(true);
+    setSignupError(null);
     
-    // This is where you would integrate with AWS Cognito
-    // For example: Auth.signUp({
-    //   username: data.email,
-    //   password: data.password,
-    //   attributes: {
-    //     given_name: data.firstName,
-    //     family_name: data.lastName,
-    //   }
-    // })
-    
-    toast({
-      title: "Account Request Submitted",
-      description: "Your account has been created and is pending admin approval. You'll receive an email when your account is approved.",
-    });
+    try {
+      await authService.signUp(data.email, data.password, data.firstName, data.lastName);
+      
+      toast({
+        title: "Account Request Submitted",
+        description: "Your account has been created and is pending admin approval. You'll receive an email when your account is approved.",
+      });
+      
+      // Reset the form after successful signup
+      form.reset();
+      
+    } catch (error: any) {
+      setSignupError(error.message || "Signup failed. Please try again.");
+      toast({
+        title: "Signup Failed",
+        description: error.message || "There was an error creating your account. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {signupError && (
+          <Alert className="bg-red-50 border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">{signupError}</AlertDescription>
+          </Alert>
+        )}
+        
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -73,6 +94,7 @@ const SignupForm = () => {
                     placeholder="John" 
                     {...field} 
                     className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                    disabled={isLoading}
                   />
                 </FormControl>
                 <FormMessage />
@@ -91,6 +113,7 @@ const SignupForm = () => {
                     placeholder="Doe" 
                     {...field} 
                     className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                    disabled={isLoading}
                   />
                 </FormControl>
                 <FormMessage />
@@ -111,6 +134,7 @@ const SignupForm = () => {
                   type="email" 
                   {...field} 
                   className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                  disabled={isLoading}
                 />
               </FormControl>
               <FormMessage />
@@ -125,6 +149,7 @@ const SignupForm = () => {
             <PasswordInput
               field={field}
               label="Password"
+              disabled={isLoading}
             />
           )}
         />
@@ -136,6 +161,7 @@ const SignupForm = () => {
             <PasswordInput
               field={field}
               label="Confirm Password"
+              disabled={isLoading}
             />
           )}
         />
@@ -149,6 +175,7 @@ const SignupForm = () => {
                 <Checkbox
                   checked={field.value}
                   onCheckedChange={field.onChange}
+                  disabled={isLoading}
                 />
               </FormControl>
               <div className="space-y-1 leading-none">
@@ -160,8 +187,12 @@ const SignupForm = () => {
           )}
         />
         
-        <Button type="submit" className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
-          Create Account
+        <Button 
+          type="submit" 
+          className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+          disabled={isLoading}
+        >
+          {isLoading ? "Creating Account..." : "Create Account"}
         </Button>
 
         <div className="text-sm text-center text-gray-500">
