@@ -43,22 +43,43 @@ export const signUp = async (
   }
 };
 
-// Get pending users function (to be implemented)
+// Get pending users function (returns mock data for UI testing)
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
-    // This is a stub function - implement according to requirements
-    // For now, return an empty array to prevent build errors
-    return [];
+    // Return mock data for testing the admin interface
+    return [
+      {
+        id: "user1",
+        email: "john.doe@example.com",
+        firstName: "John",
+        lastName: "Doe",
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: "user2",
+        email: "jane.smith@example.com",
+        firstName: "Jane",
+        lastName: "Smith",
+        createdAt: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+      },
+      {
+        id: "user3",
+        email: "robert.johnson@example.com",
+        firstName: "Robert",
+        lastName: "Johnson",
+        createdAt: new Date(Date.now() - 172800000).toISOString() // 2 days ago
+      }
+    ];
   } catch (error) {
     console.error("Error fetching pending users:", error);
     return [];
   }
 };
 
-// Approve user function (to be implemented)
+// Approve user function
 export const approveUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    // This is a stub function - implement according to requirements
+    // Mock implementation
     toast({
       title: "User Approved",
       description: "User has been successfully approved."
@@ -75,10 +96,10 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
   }
 };
 
-// Reject user function (to be implemented)
+// Reject user function
 export const rejectUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    // This is a stub function - implement according to requirements
+    // Mock implementation
     toast({
       title: "User Rejected",
       description: "User has been rejected."

@@ -1,4 +1,3 @@
-
 import { cognitoConfig } from '@/config/cognito';
 
 // Get current authenticated user
@@ -27,14 +26,11 @@ export const isAuthenticated = async (): Promise<boolean> => {
 // Check if user is an admin by verifying their group membership
 export const isAdmin = async (): Promise<boolean> => {
   try {
-    const idToken = localStorage.getItem('id_token');
-    if (!idToken) return false;
+    const userInfo = await getCurrentUser();
+    if (!userInfo) return false;
     
-    // Parse the ID token (without verification, as we trust our local storage)
-    const payload = JSON.parse(atob(idToken.split('.')[1]));
-    
-    // Extract the "cognito:groups" claim
-    const groups = payload["cognito:groups"];
+    // Handle both cognito groups format and our direct admin login format
+    const groups = userInfo["cognito:groups"];
     
     // Check if the user is in the Admin group
     return Array.isArray(groups) && groups.includes("Admin");
