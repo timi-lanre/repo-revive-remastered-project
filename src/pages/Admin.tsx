@@ -43,9 +43,16 @@ const Admin = () => {
         
       if (error) throw error;
       
+      console.log('Found profiles:', profiles); // Debug log
+      
       const usersWithEmail = await Promise.all(
         profiles.map(async (profile) => {
-          const { data: { user } } = await supabase.auth.admin.getUserById(profile.user_id);
+          const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(profile.user_id);
+          if (userError) {
+            console.error('Error fetching user:', userError); // Debug log
+            return null;
+          }
+          console.log('Found user:', user); // Debug log
           return {
             id: profile.user_id,
             email: user?.email || 'No email available',
@@ -58,7 +65,10 @@ const Admin = () => {
         })
       );
       
-      setAllUsers(usersWithEmail);
+      const validUsers = usersWithEmail.filter(user => user !== null) as UserProfile[];
+      console.log('Final user list:', validUsers); // Debug log
+      
+      setAllUsers(validUsers);
     } catch (error: any) {
       console.error("Error loading users:", error);
       setLoadingError(error.message || "Failed to load users");
