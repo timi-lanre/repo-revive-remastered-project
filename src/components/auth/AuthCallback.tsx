@@ -1,9 +1,7 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services/auth';
 import { toast } from '@/components/ui/use-toast';
-import { fetchAuthSession } from 'aws-amplify/auth';
 
 const AuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -21,12 +19,13 @@ const AuthCallback = () => {
         // If there's a code parameter, exchange it for tokens
         if (code) {
           try {
-            // In Amplify v6, the OAuth flow is handled automatically
-            // We just need to fetch the session to verify authentication
-            const session = await fetchAuthSession();
-            console.log("Auth session obtained:", session);
+            // Handle OAuth callback with Supabase
+            const { data, error } = await authService.handleOAuthCallback(code);
+            if (error) throw error;
+            console.log("Auth session obtained:", data);
           } catch (error) {
             console.error("Error exchanging code for tokens:", error);
+            throw error;
           }
         }
         
