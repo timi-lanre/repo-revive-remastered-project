@@ -1,12 +1,17 @@
 
-import { Auth } from 'aws-amplify';
+import { signIn, signUp, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 
 export const authService = {
   // Sign in function
   signIn: async (email: string, password: string) => {
     try {
-      const user = await Auth.signIn(email, password);
-      return user;
+      const { nextStep } = await signIn({
+        username: email,
+        password,
+      });
+      
+      // Check if there's a next step (like custom challenge for admin approval)
+      return { nextStep };
     } catch (error: any) {
       console.error('Error signing in:', error);
       throw error;
@@ -16,16 +21,18 @@ export const authService = {
   // Sign up function
   signUp: async (email: string, password: string, firstName: string, lastName: string) => {
     try {
-      const { user } = await Auth.signUp({
+      const { nextStep } = await signUp({
         username: email,
         password,
-        attributes: {
-          email,
-          given_name: firstName,
-          family_name: lastName,
+        options: {
+          userAttributes: {
+            email,
+            given_name: firstName,
+            family_name: lastName,
+          },
         },
       });
-      return user;
+      return { nextStep };
     } catch (error: any) {
       console.error('Error signing up:', error);
       throw error;
@@ -35,7 +42,7 @@ export const authService = {
   // Sign out function
   signOut: async () => {
     try {
-      await Auth.signOut();
+      await signOut();
     } catch (error: any) {
       console.error('Error signing out:', error);
       throw error;
@@ -45,7 +52,7 @@ export const authService = {
   // Get current authenticated user
   getCurrentUser: async () => {
     try {
-      return await Auth.currentAuthenticatedUser();
+      return await getCurrentUser();
     } catch (error) {
       console.error('Not authenticated:', error);
       return null;
@@ -55,11 +62,10 @@ export const authService = {
   // Check if user is authenticated
   isAuthenticated: async () => {
     try {
-      await Auth.currentAuthenticatedUser();
-      return true;
+      const session = await fetchAuthSession();
+      return session.tokens !== undefined;
     } catch {
       return false;
     }
   },
 };
-

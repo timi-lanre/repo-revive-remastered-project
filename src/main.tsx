@@ -8,9 +8,11 @@ import { cognitoConfig } from './config/cognito.ts';
 // Configure Amplify
 Amplify.configure({
   Auth: {
-    region: cognitoConfig.region,
-    userPoolId: cognitoConfig.userPoolId,
-    userPoolWebClientId: cognitoConfig.userPoolWebClientId,
+    Cognito: {
+      userPoolId: cognitoConfig.userPoolId,
+      userPoolClientId: cognitoConfig.userPoolWebClientId,
+      region: cognitoConfig.region,
+    }
   },
 });
 
