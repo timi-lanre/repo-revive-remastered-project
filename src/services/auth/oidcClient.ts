@@ -10,10 +10,9 @@ export async function initializeOidcClient(): Promise<any> {
   try {
     const issuer = await Issuer.discover(`https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}`);
     
-    // Create client
+    // Create client with correct props
     oidcClient = new issuer.Client({
       client_id: cognitoConfig.userPoolWebClientId,
-      client_secret: cognitoConfig.clientSecret,
       redirect_uris: [window.location.origin + '/callback'],
       response_types: ['code'],
     });

@@ -16,13 +16,13 @@ import { Amplify } from "aws-amplify";
 
 const queryClient = new QueryClient();
 
-// Configure Amplify
+// Configure Amplify with the correct structure for v6
 Amplify.configure({
   Auth: {
     Cognito: {
-      region: cognitoConfig.region,
       userPoolId: cognitoConfig.userPoolId,
-      userPoolClientId: cognitoConfig.userPoolWebClientId
+      userPoolClientId: cognitoConfig.userPoolWebClientId,
+      region: cognitoConfig.region
     }
   }
 });
