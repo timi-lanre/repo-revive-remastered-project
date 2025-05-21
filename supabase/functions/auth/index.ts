@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@aws-sdk/client-cognito-identity-provider";
+import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, ListUsersCommand, AdminUpdateUserAttributesCommand, AdminAddUserToGroupCommand, AdminDeleteUserCommand } from "npm:@aws-sdk/client-cognito-identity-provider";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-const cognitoClient = createClient({
+const cognitoClient = new CognitoIdentityProviderClient({
   region: Deno.env.get("COGNITO_REGION"),
   credentials: {
     accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
@@ -15,7 +14,7 @@ const cognitoClient = createClient({
   },
 });
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -32,7 +31,7 @@ serve(async (req) => {
     if (path === "/signup" && req.method === "POST") {
       const { email, password, firstName, lastName } = await req.json();
 
-      const params = {
+      const createUserCommand = new AdminCreateUserCommand({
         UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
         Username: email,
         TemporaryPassword: password,
@@ -44,17 +43,19 @@ serve(async (req) => {
           { Name: "email_verified", Value: "true" }, // Auto-verify email
         ],
         MessageAction: "SUPPRESS", // Suppress welcome email
-      };
+      });
 
-      await cognitoClient.adminCreateUser(params);
+      await cognitoClient.send(createUserCommand);
 
       // Set permanent password
-      await cognitoClient.adminSetUserPassword({
+      const setPasswordCommand = new AdminSetUserPasswordCommand({
         UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
         Username: email,
         Password: password,
         Permanent: true,
       });
+
+      await cognitoClient.send(setPasswordCommand);
 
       return new Response(
         JSON.stringify({ message: "User created successfully" }),
@@ -67,12 +68,12 @@ serve(async (req) => {
 
     // Get pending users endpoint
     if (path === "/pending-users" && req.method === "GET") {
-      const params = {
+      const listUsersCommand = new ListUsersCommand({
         UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
         Filter: 'custom:status = "PENDING"',
-      };
+      });
 
-      const { Users } = await cognitoClient.listUsers(params);
+      const { Users } = await cognitoClient.send(listUsersCommand);
       
       const pendingUsers = Users?.map(user => ({
         id: user.Username,
@@ -94,7 +95,7 @@ serve(async (req) => {
       const userId = path.split("/").pop();
       
       // Update user status
-      await cognitoClient.adminUpdateUserAttributes({
+      const updateAttributesCommand = new AdminUpdateUserAttributesCommand({
         UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
         Username: userId,
         UserAttributes: [
@@ -102,12 +103,16 @@ serve(async (req) => {
         ],
       });
 
+      await cognitoClient.send(updateAttributesCommand);
+
       // Add user to approved group
-      await cognitoClient.adminAddUserToGroup({
+      const addToGroupCommand = new AdminAddUserToGroupCommand({
         UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
         Username: userId,
         GroupName: "Users"
       });
+
+      await cognitoClient.send(addToGroupCommand);
 
       return new Response(
         JSON.stringify({ message: "User approved successfully" }),
@@ -122,10 +127,12 @@ serve(async (req) => {
     if (path.startsWith("/reject-user/") && req.method === "POST") {
       const userId = path.split("/").pop();
       
-      await cognitoClient.adminDeleteUser({
+      const deleteUserCommand = new AdminDeleteUserCommand({
         UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
         Username: userId,
       });
+
+      await cognitoClient.send(deleteUserCommand);
 
       return new Response(
         JSON.stringify({ message: "User rejected successfully" }),
