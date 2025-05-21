@@ -12,6 +12,6 @@ export const cognitoConfig = {
   apiUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth`,
   
   // Auth configuration
-  authenticationFlowType: "USER_PASSWORD_AUTH",
+  authenticationFlowType: "USER_SRP_AUTH",
   enableRefreshTokens: true,
 };

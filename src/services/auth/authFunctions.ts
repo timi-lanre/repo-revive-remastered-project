@@ -5,12 +5,12 @@ import { signIn, signOut as amplifySignOut, getCurrentUser, fetchAuthSession } f
 // Production-ready login with email and password using Amplify Auth
 export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
   try {
-    // Sign in using Amplify Auth with USER_PASSWORD_AUTH flow
+    // Sign in using Amplify Auth with USER_SRP_AUTH flow
     const signInResult = await signIn({
       username: email,
       password: password,
       options: {
-        authFlowType: "USER_PASSWORD_AUTH"
+        authFlowType: "USER_SRP_AUTH"
       }
     });
     
