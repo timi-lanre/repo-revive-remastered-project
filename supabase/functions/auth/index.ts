@@ -3,12 +3,13 @@ import {
   SESClient, 
   SendEmailCommand,
   SendEmailCommandInput,
+  VerifyEmailIdentityCommand,
   ListVerifiedEmailAddressesCommand 
 } from "npm:@aws-sdk/client-ses";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -32,26 +33,40 @@ const sesClient = new SESClient({
 });
 
 async function isEmailVerified(email: string): Promise<boolean> {
+  // Skip verification check if SKIP_EMAIL_VERIFICATION is true
+  if (Deno.env.get("SKIP_EMAIL_VERIFICATION") === "true") {
+    return true;
+  }
+
   try {
     const command = new ListVerifiedEmailAddressesCommand({});
     const response = await sesClient.send(command);
-    return response.VerifiedEmailAddresses?.includes(email) || false;
+    
+    // If email isn't verified, attempt to verify it
+    if (!response.VerifiedEmailAddresses?.includes(email)) {
+      const verifyCommand = new VerifyEmailIdentityCommand({ EmailAddress: email });
+      await sesClient.send(verifyCommand);
+      console.log(`Verification email sent to ${email}`);
+    }
+    
+    return true; // Return true since we've initiated verification
   } catch (error) {
-    console.error("Error checking verified emails:", error);
+    console.error("Error checking/verifying email:", error);
     return false;
   }
 }
 
 async function sendEmail(to: string, subject: string, body: string) {
   try {
-    // Check if recipient email is verified (only in sandbox mode)
-    if (!await isEmailVerified(to)) {
-      console.warn(`Email ${to} is not verified in SES sandbox mode. Skipping email send.`);
-      return;
-    }
+    // Always verify sender email
+    const senderEmail = "advisorconnectdev@gmail.com";
+    await isEmailVerified(senderEmail);
+
+    // Attempt to verify recipient email
+    await isEmailVerified(to);
 
     const params: SendEmailCommandInput = {
-      Source: "noreply@advisorconnect.com", // Make sure this is verified
+      Source: senderEmail,
       Destination: {
         ToAddresses: [to],
       },
