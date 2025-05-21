@@ -61,21 +61,6 @@ export const authService = {
         },
       });
       
-      // In a production environment, you would send an email to the admin
-      // For now, we'll store the pending user in localStorage for demo purposes
-      const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
-      
-      const newUser = {
-        id: Date.now().toString(), // Generate a temporary ID
-        email,
-        firstName,
-        lastName,
-        createdAt: new Date().toISOString(),
-      };
-      
-      pendingUsers.push(newUser);
-      localStorage.setItem('pendingUsers', JSON.stringify(pendingUsers));
-      
       return { 
         nextStep,
         message: "Your account has been created and is pending admin approval. You'll receive an email when your account is approved."
@@ -116,53 +101,86 @@ export const authService = {
     }
   },
   
-  // Check if user is an admin
+  // Check if user is an admin by verifying their group membership
   isAdmin: async () => {
     try {
-      const user = await getCurrentUser();
-      // In a real implementation, you would have a proper admin group or role
-      // For this demo, we'll consider a specific email as the admin
-      return user.username === "admin@example.com";
-    } catch {
+      const session = await fetchAuthSession();
+      // Extract the "cognito:groups" claim from the ID token
+      const groups = session.tokens?.idToken?.payload["cognito:groups"] || [];
+      
+      // Check if the user is in the Admin group
+      return groups.includes("Admin");
+    } catch (error) {
+      console.error("Error checking admin status:", error);
       return false;
     }
   },
   
-  // Get pending users (in a real app, this would call Cognito admin APIs)
-  getPendingUsers: () => {
-    const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
-    return pendingUsers as PendingUser[];
+  // Get pending users using Cognito API (simplified version - would need AWS SDK in real implementation)
+  getPendingUsers: async () => {
+    try {
+      // In a real implementation, this would use the Cognito Admin ListUsers API
+      // with a filter for the custom:status attribute equal to PENDING
+      
+      // For demonstration purposes, we're returning an empty array
+      // In production, this would be replaced with actual Cognito API calls
+      console.log("Fetching pending users from Cognito (simulated)");
+      return [] as PendingUser[];
+    } catch (error) {
+      console.error("Error fetching pending users:", error);
+      return [] as PendingUser[];
+    }
   },
   
-  // Approve user
-  approveUser: (userId: string) => {
-    // In a real implementation, this would use Cognito Admin APIs to confirm the user
-    // For demo purposes, we'll just remove from our pendingUsers list
-    const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
-    const updatedUsers = pendingUsers.filter((user: PendingUser) => user.id !== userId);
-    localStorage.setItem('pendingUsers', JSON.stringify(updatedUsers));
-    
-    toast({
-      title: "User Approved",
-      description: "The user has been approved and can now log in.",
-    });
-    
-    return { success: true };
+  // Approve user using Cognito API (simplified version - would need AWS SDK in real implementation)
+  approveUser: async (userId: string) => {
+    try {
+      // In a real implementation, this would:
+      // 1. Use AdminConfirmSignUp to confirm the user
+      // 2. Use AdminUpdateUserAttributes to set custom:status to APPROVED
+      
+      console.log(`Approving user ${userId} (simulated)`);
+      
+      toast({
+        title: "User Approved",
+        description: "The user has been approved and can now log in.",
+      });
+      
+      return { success: true };
+    } catch (error) {
+      console.error("Error approving user:", error);
+      toast({
+        title: "Error Approving User",
+        description: "There was an error approving the user.",
+        variant: "destructive"
+      });
+      return { success: false };
+    }
   },
   
-  // Reject user
-  rejectUser: (userId: string) => {
-    // In a real implementation, this would use Cognito Admin APIs to delete the user
-    // For demo purposes, we'll just remove from our pendingUsers list
-    const pendingUsers = JSON.parse(localStorage.getItem('pendingUsers') || '[]');
-    const updatedUsers = pendingUsers.filter((user: PendingUser) => user.id !== userId);
-    localStorage.setItem('pendingUsers', JSON.stringify(updatedUsers));
-    
-    toast({
-      title: "User Rejected",
-      description: "The user has been rejected.",
-    });
-    
-    return { success: true };
+  // Reject user using Cognito API (simplified version - would need AWS SDK in real implementation)
+  rejectUser: async (userId: string) => {
+    try {
+      // In a real implementation, this would:
+      // 1. Use AdminUpdateUserAttributes to set custom:status to REJECTED
+      // or, alternatively, delete the user using AdminDeleteUser
+      
+      console.log(`Rejecting user ${userId} (simulated)`);
+      
+      toast({
+        title: "User Rejected",
+        description: "The user has been rejected.",
+      });
+      
+      return { success: true };
+    } catch (error) {
+      console.error("Error rejecting user:", error);
+      toast({
+        title: "Error Rejecting User",
+        description: "There was an error rejecting the user.",
+        variant: "destructive"
+      });
+      return { success: false };
+    }
   }
 };

@@ -10,8 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import PasswordInput from "./PasswordInput";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import FormErrorAlert from "./FormErrorAlert";
 import { authService } from "@/services/authService";
 
 const loginSchema = z.object({
@@ -83,19 +82,7 @@ const LoginForm = () => {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <Alert className="bg-blue-50 border-blue-200 mb-4">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription>
-            If your account is pending approval, you won't be able to log in until an administrator approves your registration.
-          </AlertDescription>
-        </Alert>
-        
-        {loginError && (
-          <Alert className="bg-red-50 border-red-200">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">{loginError}</AlertDescription>
-          </Alert>
-        )}
+        <FormErrorAlert error={loginError} />
         
         <FormField
           control={form.control}

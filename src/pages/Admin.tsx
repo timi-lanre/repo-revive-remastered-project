@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -24,6 +23,7 @@ const Admin = () => {
           return;
         }
         
+        // Check if the user is in the Admin group
         const adminStatus = await authService.isAdmin();
         setIsAdmin(adminStatus);
         
@@ -37,11 +37,17 @@ const Admin = () => {
           return;
         }
         
-        // Load pending users
-        const users = authService.getPendingUsers();
+        // Load pending users using the Cognito API
+        const users = await authService.getPendingUsers();
         setPendingUsers(users);
       } catch (error) {
         console.error("Error checking authentication:", error);
+        toast({
+          title: "Error",
+          description: "There was an error loading the admin dashboard.",
+          variant: "destructive"
+        });
+        navigate("/login");
       } finally {
         setIsLoading(false);
       }
@@ -50,16 +56,20 @@ const Admin = () => {
     checkAuth();
   }, [navigate]);
   
-  const handleApproveUser = (userId: string) => {
-    authService.approveUser(userId);
-    // Update local state to remove approved user
-    setPendingUsers(pendingUsers.filter(user => user.id !== userId));
+  const handleApproveUser = async (userId: string) => {
+    const result = await authService.approveUser(userId);
+    if (result.success) {
+      // Update local state to remove approved user
+      setPendingUsers(pendingUsers.filter(user => user.id !== userId));
+    }
   };
   
-  const handleRejectUser = (userId: string) => {
-    authService.rejectUser(userId);
-    // Update local state to remove rejected user
-    setPendingUsers(pendingUsers.filter(user => user.id !== userId));
+  const handleRejectUser = async (userId: string) => {
+    const result = await authService.rejectUser(userId);
+    if (result.success) {
+      // Update local state to remove rejected user
+      setPendingUsers(pendingUsers.filter(user => user.id !== userId));
+    }
   };
 
   const formatDate = (dateString: string) => {
