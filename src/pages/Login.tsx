@@ -1,39 +1,104 @@
 
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Eye, EyeOff } from "lucide-react";
+
+const loginSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  rememberMe: z.boolean().optional(),
+});
+
+const signupSchema = z.object({
+  firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
+  lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  confirmPassword: z.string(),
+  acceptTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the terms and conditions" }),
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+type SignupFormValues = z.infer<typeof signupSchema>;
 
 const Login = () => {
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, you would handle authentication here
+  const navigate = useNavigate();
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+  
+  const loginForm = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      rememberMe: false,
+    },
+  });
+
+  const signupForm = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      acceptTerms: false,
+    },
+  });
+
+  const onLoginSubmit = (data: LoginFormValues) => {
+    // In a real app, you would handle authentication with AWS Cognito here
+    console.log("Login data:", data);
+    
     toast({
       title: "Login Successful",
       description: "Redirecting to dashboard...",
     });
+    
     // Simulate a redirect after login
     setTimeout(() => {
-      window.location.href = "/dashboard";
+      navigate("/dashboard");
     }, 1500);
   };
 
-  const handleSignup = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, you would handle registration here
+  const onSignupSubmit = (data: SignupFormValues) => {
+    // In a real app, you would handle registration with AWS Cognito here
+    console.log("Signup data:", data);
+    
     toast({
       title: "Account Created",
       description: "Please check your email to verify your account.",
     });
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-lg border border-gray-100">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <Link to="/">
@@ -42,7 +107,7 @@ const Login = () => {
                 alt="Advisor Connect"
                 width={200}
                 height={80}
-                className="object-contain"
+                className="object-contain hover:opacity-90 transition-opacity"
               />
             </Link>
           </div>
@@ -57,54 +122,242 @@ const Login = () => {
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
+            
             <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="you@example.com" required />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-                  <Input id="password" type="password" placeholder="••••••••" required />
-                </div>
-                <Button type="submit" className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
-                  Sign in
-                </Button>
-              </form>
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                  <FormField
+                    control={loginForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="you@example.com" 
+                            type="email" 
+                            {...field} 
+                            className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Password</FormLabel>
+                          <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
+                            Forgot password?
+                          </Link>
+                        </div>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"} 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="pr-10 focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                            />
+                            <button 
+                              type="button" 
+                              className="absolute right-3 top-2.5 text-gray-500"
+                              onClick={togglePasswordVisibility}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-5 w-5" />
+                              ) : (
+                                <Eye className="h-5 w-5" />
+                              )}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={loginForm.control}
+                    name="rememberMe"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="cursor-pointer">
+                            Remember me
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button type="submit" className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
+                    Sign in
+                  </Button>
+                </form>
+              </Form>
             </TabsContent>
+            
             <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" placeholder="John" required />
+              <Form {...signupForm}>
+                <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={signupForm.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="John" 
+                              {...field} 
+                              className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={signupForm.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Doe" 
+                              {...field} 
+                              className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" placeholder="Doe" required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="you@example.com" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" placeholder="••••••••" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input id="confirmPassword" type="password" placeholder="••••••••" required />
-                </div>
-                <Button type="submit" className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
-                  Create Account
-                </Button>
-              </form>
+                  
+                  <FormField
+                    control={signupForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="you@example.com" 
+                            type="email" 
+                            {...field} 
+                            className="focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={signupForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"} 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="pr-10 focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                            />
+                            <button 
+                              type="button" 
+                              className="absolute right-3 top-2.5 text-gray-500"
+                              onClick={togglePasswordVisibility}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-5 w-5" />
+                              ) : (
+                                <Eye className="h-5 w-5" />
+                              )}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={signupForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type={showConfirmPassword ? "text" : "password"} 
+                              placeholder="••••••••" 
+                              {...field} 
+                              className="pr-10 focus:border-[#E5D3BC] focus:ring-[#E5D3BC]"
+                            />
+                            <button 
+                              type="button" 
+                              className="absolute right-3 top-2.5 text-gray-500"
+                              onClick={toggleConfirmPasswordVisibility}
+                            >
+                              {showConfirmPassword ? (
+                                <EyeOff className="h-5 w-5" />
+                              ) : (
+                                <Eye className="h-5 w-5" />
+                              )}
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={signupForm.control}
+                    name="acceptTerms"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="cursor-pointer">
+                            I accept the <a href="/terms" className="text-blue-600 hover:underline">Terms of Service</a> and <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button type="submit" className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
+                    Create Account
+                  </Button>
+                </form>
+              </Form>
             </TabsContent>
           </Tabs>
         </CardContent>
