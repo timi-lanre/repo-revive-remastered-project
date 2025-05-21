@@ -18,6 +18,9 @@ export const loginWithEmailPassword = async (email: string, password: string): P
     const signInResult = await signIn({
       username: email,
       password: password,
+      options: {
+        authFlowType: "USER_PASSWORD_AUTH"
+      }
     });
     
     // Handle force change password challenge
@@ -29,19 +32,31 @@ export const loginWithEmailPassword = async (email: string, password: string): P
       });
       
       // Prompt user for new password
-      const newPassword = prompt("Please enter a new password (minimum 8 characters):");
+      const newPassword = prompt("Please enter a new password (minimum 8 characters, must include uppercase, lowercase, numbers, and special characters):");
       
       if (!newPassword) {
         throw new Error("New password is required");
       }
       
-      // Confirm sign in with new password
-      const confirmResult = await confirmSignIn({
-        challengeResponse: newPassword,
-      });
-      
-      if (!confirmResult.isSignedIn) {
-        throw new Error("Failed to change password");
+      try {
+        // Confirm sign in with new password
+        const confirmResult = await confirmSignIn({
+          challengeResponse: newPassword
+        });
+        
+        if (!confirmResult.isSignedIn) {
+          throw new Error("Failed to change password");
+        }
+        
+        toast({
+          title: "Password Changed",
+          description: "Your password has been updated successfully."
+        });
+        
+        return { success: true };
+      } catch (confirmError) {
+        console.error("Error confirming password change:", confirmError);
+        throw new Error("Failed to set new password. Please ensure it meets all requirements.");
       }
     }
     
