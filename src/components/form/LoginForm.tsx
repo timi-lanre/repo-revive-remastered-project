@@ -12,6 +12,8 @@ const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   
   const handleLogin = async () => {
@@ -69,28 +71,80 @@ const LoginForm = () => {
     }
   };
   
+  const handleRegisteredAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    
+    try {
+      setIsLoading(true);
+      
+      // Login with registered admin credentials
+      const result = await authService.loginWithEmailPassword(email, adminPassword);
+      
+      if (result.success) {
+        toast({
+          title: "Login Successful",
+          description: "You've been logged in with your registered admin credentials."
+        });
+        
+        // Redirect to admin page
+        window.location.href = "/admin";
+      } else {
+        setError("Invalid credentials. Please check your email and password.");
+        setIsLoading(false);
+      }
+    } catch (error: any) {
+      console.error("Admin login error:", error);
+      setError(error.message || "Failed to login with registered credentials");
+      setIsLoading(false);
+    }
+  };
+  
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="cognito" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="cognito">Cognito Login</TabsTrigger>
+      <Tabs defaultValue="registered" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsTrigger value="registered">Registered Admin</TabsTrigger>
           <TabsTrigger value="direct">Direct Admin</TabsTrigger>
+          <TabsTrigger value="cognito">Cognito Login</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="cognito">
-          <div className="text-center mb-6">
-            <p className="text-sm text-gray-500 mb-4">
-              Click the button below to sign in with your credentials.
-            </p>
-          </div>
-          
-          <Button 
-            onClick={handleLogin}
-            className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
-            disabled={isLoading}
-          >
-            {isLoading ? "Redirecting to login..." : "Sign in with Cognito"}
-          </Button>
+        <TabsContent value="registered">
+          <form onSubmit={handleRegisteredAdminLogin} className="space-y-4">
+            <FormErrorAlert error={error} />
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="adminPassword">Password</Label>
+              <Input
+                id="adminPassword"
+                type="password"
+                placeholder="•••••••"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                required
+              />
+            </div>
+            
+            <Button 
+              type="submit"
+              className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+              disabled={isLoading}
+            >
+              {isLoading ? "Logging in..." : "Login with Admin Credentials"}
+            </Button>
+          </form>
         </TabsContent>
         
         <TabsContent value="direct">
@@ -134,6 +188,22 @@ const LoginForm = () => {
               </p>
             </div>
           </form>
+        </TabsContent>
+        
+        <TabsContent value="cognito">
+          <div className="text-center mb-6">
+            <p className="text-sm text-gray-500 mb-4">
+              Click the button below to sign in with your credentials.
+            </p>
+          </div>
+          
+          <Button 
+            onClick={handleLogin}
+            className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+            disabled={isLoading}
+          >
+            {isLoading ? "Redirecting to login..." : "Sign in with Cognito"}
+          </Button>
         </TabsContent>
       </Tabs>
     </div>

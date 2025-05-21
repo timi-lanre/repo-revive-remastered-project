@@ -1,3 +1,4 @@
+
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
 import { getOidcClient, generateAuthParams } from './oidcClient';
@@ -33,6 +34,37 @@ export const initiateLogin = async (): Promise<void> => {
       description: "Failed to initialize OIDC client. Please try again later.",
       variant: "destructive"
     });
+    throw error;
+  }
+};
+
+// New function for registered admin login with email and password
+export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
+  try {
+    // This is a simplified mock implementation for the registered admin login
+    // In a real app, this would validate against a database or auth provider
+    
+    // Check if credentials match your pre-registered admin user
+    // Replace these with your actual registered admin credentials
+    if (email === "admin@example.com" && password === "adminpassword") {
+      // Set up the admin user info and tokens
+      const adminUserInfo = {
+        sub: "registered-admin-id",
+        email: email,
+        name: "Registered Admin",
+        "cognito:groups": ["Admin"]
+      };
+      
+      localStorage.setItem("id_token", "registered-admin-id-token");
+      localStorage.setItem("access_token", "registered-admin-access-token");
+      localStorage.setItem("user_info", JSON.stringify(adminUserInfo));
+      
+      return { success: true };
+    }
+    
+    return { success: false };
+  } catch (error: any) {
+    console.error('Error during login:', error);
     throw error;
   }
 };

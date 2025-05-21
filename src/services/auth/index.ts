@@ -1,6 +1,6 @@
 
 import { initializeOidcClient } from './oidcClient';
-import { initiateLogin, handleCallback, signOut } from './authFunctions';
+import { initiateLogin, handleCallback, signOut, loginWithEmailPassword } from './authFunctions';
 import { getCurrentUser, isAuthenticated, isAdmin } from './userFunctions';
 import { 
   signUp, 
@@ -25,7 +25,8 @@ export const authService = {
   signUp,
   getPendingUsers,
   approveUser,
-  rejectUser
+  rejectUser,
+  loginWithEmailPassword
 };
 
 // Re-export types
