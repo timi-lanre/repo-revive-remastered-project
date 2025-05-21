@@ -23,8 +23,9 @@ const LoginForm = () => {
       const result = await authService.loginWithEmailPassword(email, password);
       
       if (result.success) {
-        // Redirect to admin page
-        window.location.href = "/admin";
+        // Redirect to dashboard/admin page based on role
+        const isAdmin = await authService.isAdmin();
+        window.location.href = isAdmin ? "/admin" : "/dashboard";
       } else {
         setError("Invalid credentials. Please check your email and password.");
         setIsLoading(false);

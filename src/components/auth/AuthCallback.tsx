@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services/auth';
 import { toast } from '@/components/ui/use-toast';
+import { Auth } from 'aws-amplify';
 
 const AuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -17,10 +18,16 @@ const AuthCallback = () => {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
         
-        // If there's a code parameter, we're in an OAuth flow
+        // If there's a code parameter, exchange it for tokens
         if (code) {
-          // Exchange code for token - implement this in your auth service if needed
-          // await authService.exchangeCodeForToken(code);
+          try {
+            // Attempt to complete the authentication with the code
+            // This is handled by Amplify internally
+            const user = await Auth.currentAuthenticatedUser();
+            console.log("User authenticated:", user);
+          } catch (error) {
+            console.error("Error exchanging code for tokens:", error);
+          }
         }
         
         // Check if the user is authenticated

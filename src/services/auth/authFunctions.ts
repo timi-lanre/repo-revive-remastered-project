@@ -1,53 +1,52 @@
 
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
+import { Auth } from 'aws-amplify';
 
-// Production-ready login with email and password that uses your user pool
+// Initialize Amplify Auth with the Cognito configuration
+const initializeAuth = () => {
+  if (!Auth.configure) return;
+
+  Auth.configure({
+    region: cognitoConfig.region,
+    userPoolId: cognitoConfig.userPoolId,
+    userPoolWebClientId: cognitoConfig.userPoolWebClientId,
+    authenticationFlowType: 'USER_PASSWORD_AUTH',
+  });
+};
+
+// Call initialize on module import
+initializeAuth();
+
+// Production-ready login with email and password using Amplify Auth
 export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
   try {
-    // This is the integration point with your user pool
-    // You would typically use the AWS SDK or another authentication library here
+    // Sign in using Amplify Auth
+    const user = await Auth.signIn(email, password);
     
-    const { region, userPoolId, userPoolWebClientId } = cognitoConfig;
-    
-    // For demonstration purposes, we'll validate against your configured user pool credentials
-    // In a production environment, this would be a call to your authentication service
-    
-    // Make a request to your authentication endpoint or use SDK
-    const response = await fetch(`https://${userPoolId}.auth.${region}.amazoncognito.com/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'password',
-        client_id: userPoolWebClientId,
-        username: email,
-        password: password,
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Authentication failed');
+    // Store user info and tokens
+    if (user) {
+      // Storing tokens is handled by Amplify Auth
+      
+      // Store user info for our app's usage
+      const userInfo = {
+        sub: user.username || user.attributes?.sub,
+        email: user.attributes?.email || email,
+        name: user.attributes?.name || email,
+        "cognito:groups": user.signInUserSession?.accessToken?.payload["cognito:groups"] || []
+      };
+      
+      localStorage.setItem("user_info", JSON.stringify(userInfo));
+      
+      toast({
+        title: "Login Successful",
+        description: "You've been successfully logged in."
+      });
+      
+      return { success: true };
     }
     
-    const data = await response.json();
-    
-    // Store tokens securely
-    localStorage.setItem("id_token", data.id_token);
-    localStorage.setItem("access_token", data.access_token);
-    
-    // Parse user info from the ID token
-    const payload = JSON.parse(atob(data.id_token.split('.')[1]));
-    localStorage.setItem("user_info", JSON.stringify(payload));
-    
-    toast({
-      title: "Login Successful",
-      description: "You've been successfully logged in."
-    });
-    
-    return { success: true };
+    throw new Error("Invalid login response");
   } catch (error: any) {
     console.error('Error during login:', error);
     toast({
@@ -56,12 +55,10 @@ export const loginWithEmailPassword = async (email: string, password: string): P
       variant: "destructive"
     });
     
-    // For development/testing fallback (remove in production)
-    // Check if this is an admin user for development purposes
+    // Developer account fallback for testing (remove in production)
     if ((email === "admin@example.com" && password === "adminpassword") || 
         (email === "admin" && password === "admin123")) {
       
-      // Set up the admin user info
       const adminUserInfo = {
         sub: "admin-user-id",
         email: email,
@@ -88,13 +85,13 @@ export const loginWithEmailPassword = async (email: string, password: string): P
 // Sign out function
 export const signOut = async (): Promise<void> => {
   try {
-    // Clear tokens and user info
+    // Sign out from Cognito
+    await Auth.signOut();
+    
+    // Clear local storage items
     localStorage.removeItem('id_token');
     localStorage.removeItem('access_token');
     localStorage.removeItem('user_info');
-    
-    // For production, you might want to revoke the token on the server side
-    // Implement a call to your auth server to invalidate the token
     
     // Redirect to home page
     window.location.href = "/";
