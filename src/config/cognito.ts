@@ -8,17 +8,21 @@ export const cognitoConfig = {
   // API endpoint for custom Cognito operations
   apiUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth`,
   
-  // Additional configuration for hosted UI (if needed)
-  oAuthDomain: "", // Your Cognito domain if using hosted UI
+  // OAuth configuration for hosted UI
+  oauth: {
+    domain: "auth.yourdomain.com", // Replace with your actual Cognito domain
+  },
+  
+  // Additional configuration
   redirectUri: window.location.origin + "/callback",
   responseType: "code", // Use authorization code grant flow for better security
 };
 
 // Function to get Cognito OAuth URL for sign-in (if using hosted UI)
 export const getCognitoSignInUrl = () => {
-  const { userPoolWebClientId, oAuthDomain, redirectUri, responseType } = cognitoConfig;
+  const { userPoolWebClientId, oauth, redirectUri, responseType } = cognitoConfig;
   
-  if (!oAuthDomain) {
+  if (!oauth.domain) {
     return null; // Direct signin is used instead of hosted UI
   }
   
@@ -29,5 +33,5 @@ export const getCognitoSignInUrl = () => {
     redirect_uri: redirectUri,
   });
   
-  return `https://${oAuthDomain}/login?${params.toString()}`;
+  return `https://${oauth.domain}/login?${params.toString()}`;
 };

@@ -17,15 +17,19 @@ const getCognitoSignInUrl = () => {
     client_id: cognitoConfig.userPoolWebClientId,
     response_type: 'code',
     scope: 'email openid profile',
-    redirect_uri: window.location.origin + '/auth/callback'
+    redirect_uri: cognitoConfig.redirectUri
   });
 
-  return `${cognitoConfig.oauth.domain}/login?${queryParams.toString()}`;
+  return `https://${cognitoConfig.oauth.domain}/login?${queryParams.toString()}`;
 };
 
 // Production-ready login with email and password using Cognito Hosted UI
 export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
   try {
+    if (!cognitoConfig.oauth.domain) {
+      throw new Error('Cognito OAuth domain is not configured');
+    }
+    
     // Redirect to Cognito Hosted UI
     window.location.href = getCognitoSignInUrl();
     return { success: true };
