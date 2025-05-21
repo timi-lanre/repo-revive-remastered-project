@@ -53,8 +53,8 @@ const SignupForm = () => {
     // })
     
     toast({
-      title: "Account Created",
-      description: "Please check your email to verify your account.",
+      title: "Account Request Submitted",
+      description: "Your account has been created and is pending admin approval. You'll receive an email when your account is approved.",
     });
   };
 
@@ -163,6 +163,10 @@ const SignupForm = () => {
         <Button type="submit" className="w-full bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
           Create Account
         </Button>
+
+        <div className="text-sm text-center text-gray-500">
+          After signing up, your account will be reviewed by an administrator before activation.
+        </div>
       </form>
     </Form>
   );

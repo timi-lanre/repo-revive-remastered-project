@@ -10,6 +10,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import PasswordInput from "./PasswordInput";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -36,7 +38,36 @@ const LoginForm = () => {
     
     // This is where you would integrate with AWS Cognito
     // For example: Auth.signIn(data.email, data.password)
+    //   .then(user => {
+    //     if (user.challengeName === 'CUSTOM_CHALLENGE') {
+    //       toast({
+    //         title: "Account Pending Approval",
+    //         description: "Your account is still pending admin approval.",
+    //       });
+    //     } else {
+    //       toast({
+    //         title: "Login Successful",
+    //         description: "Redirecting to dashboard...",
+    //       });
+    //       setTimeout(() => { navigate("/dashboard"); }, 1500);
+    //     }
+    //   })
+    //   .catch(err => {
+    //     if (err.code === 'UserNotConfirmedException') {
+    //       toast({
+    //         title: "Account Pending Approval",
+    //         description: "Your account is still pending admin approval.",
+    //       });
+    //     } else {
+    //       toast({
+    //         title: "Login Failed",
+    //         description: err.message,
+    //         variant: "destructive"
+    //       });
+    //     }
+    //   });
     
+    // Until AWS Cognito integration is complete, just simulate success
     toast({
       title: "Login Successful",
       description: "Redirecting to dashboard...",
@@ -50,6 +81,13 @@ const LoginForm = () => {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <Alert className="bg-blue-50 border-blue-200 mb-4">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription>
+            If your account is pending approval, you won't be able to log in until an administrator approves your registration.
+          </AlertDescription>
+        </Alert>
+        
         <FormField
           control={form.control}
           name="email"
