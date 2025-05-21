@@ -13,12 +13,16 @@ export const loginWithEmailPassword = async (email: string, password: string): P
     }
 
     if (data?.user) {
-      // Get user's role/status from custom claims or metadata
-      const { data: profile } = await supabase
+      // Get user's role/status from user_profiles
+      const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('status, role')
         .eq('user_id', data.user.id)
         .single();
+
+      if (profileError) {
+        throw profileError;
+      }
 
       if (profile?.status !== 'APPROVED') {
         throw new Error('Your account is pending approval');
@@ -29,6 +33,8 @@ export const loginWithEmailPassword = async (email: string, password: string): P
         description: "You've been successfully logged in."
       });
 
+      // Redirect based on role
+      window.location.href = profile.role === 'admin' ? '/admin' : '/dashboard';
       return { success: true };
     }
 
