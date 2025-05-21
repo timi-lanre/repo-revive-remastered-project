@@ -1,6 +1,8 @@
 
 import { signIn, signUp, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { toast } from '@/components/ui/use-toast';
+import { cognitoConfig } from '@/config/cognito';
+import CryptoJS from 'crypto-js';
 
 // User status enum
 export enum UserStatus {
@@ -17,13 +19,32 @@ export interface PendingUser {
   createdAt: string;
 }
 
+// Helper function to calculate SECRET_HASH
+const calculateSecretHash = (username: string) => {
+  const { userPoolWebClientId, clientSecret } = cognitoConfig;
+  
+  if (!clientSecret) return undefined;
+  
+  const message = username + userPoolWebClientId;
+  const hashDigest = CryptoJS.HmacSHA256(message, clientSecret);
+  return CryptoJS.enc.Base64.stringify(hashDigest);
+};
+
 export const authService = {
   // Sign in function
   signIn: async (email: string, password: string) => {
     try {
+      const secretHash = calculateSecretHash(email);
+      
       const { nextStep } = await signIn({
         username: email,
         password,
+        options: {
+          authFlowType: 'USER_PASSWORD_AUTH',
+          clientMetadata: {
+            ...(secretHash && { SECRET_HASH: secretHash })
+          }
+        }
       });
       
       return { nextStep };
@@ -45,6 +66,8 @@ export const authService = {
   // Sign up function
   signUp: async (email: string, password: string, firstName: string, lastName: string) => {
     try {
+      const secretHash = calculateSecretHash(email);
+      
       const { nextStep } = await signUp({
         username: email,
         password,
@@ -53,11 +76,14 @@ export const authService = {
             email,
             given_name: firstName,
             family_name: lastName,
-            // Custom attribute to track approval status (this becomes available in the admin panel)
+            // Custom attribute to track approval status
             'custom:status': UserStatus.PENDING,
           },
           // This ensures users are not auto-confirmed and need admin approval
           autoSignIn: false,
+          clientMetadata: {
+            ...(secretHash && { SECRET_HASH: secretHash })
+          }
         },
       });
       
@@ -106,10 +132,10 @@ export const authService = {
     try {
       const session = await fetchAuthSession();
       // Extract the "cognito:groups" claim from the ID token
-      const groups = session.tokens?.idToken?.payload["cognito:groups"] || [];
+      const groups = session.tokens?.idToken?.payload["cognito:groups"];
       
       // Check if the user is in the Admin group
-      return groups.includes("Admin");
+      return Array.isArray(groups) && groups.includes("Admin");
     } catch (error) {
       console.error("Error checking admin status:", error);
       return false;
