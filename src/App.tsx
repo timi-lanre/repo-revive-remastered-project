@@ -9,23 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./components/auth/AuthCallback";
-import { Amplify } from "aws-amplify";
-import { cognitoConfig } from "./config/cognito";
 
 const queryClient = new QueryClient();
-
-// Configure Amplify with the correct structure for v6
-Amplify.configure({
-  Auth: {
-    Cognito: {
-      userPoolId: cognitoConfig.userPoolId,
-      userPoolClientId: cognitoConfig.userPoolWebClientId,
-      region: cognitoConfig.region,
-      signUpVerificationMethod: 'code',
-      authenticationFlowType: 'USER_PASSWORD_AUTH'
-    }
-  }
-});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

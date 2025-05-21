@@ -1,8 +1,6 @@
 import { toast } from '@/components/ui/use-toast';
-import { cognitoConfig } from '@/config/cognito';
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { supabase } from '@/lib/supabase';
 
-// User status enum
 export enum UserStatus {
   PENDING = "PENDING",
   APPROVED = "APPROVED",
@@ -18,7 +16,6 @@ export interface PendingUser {
   status: UserStatus;
 }
 
-// User registration function
 export const signUp = async (
   email: string, 
   password: string, 
@@ -26,34 +23,39 @@ export const signUp = async (
   lastName: string
 ): Promise<{ message: string }> => {
   try {
-    // Create user in Cognito with custom attributes
-    const params = {
-      username: email,
-      password: password,
-      attributes: {
-        email: email,
-        given_name: firstName,
-        family_name: lastName,
-        'custom:status': UserStatus.PENDING
+    const { data: { user }, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          status: UserStatus.PENDING
+        }
       }
-    };
-
-    // Call Cognito API to create user
-    const result = await fetch(`${cognitoConfig.apiUrl}/signup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
     });
 
-    if (!result.ok) {
-      throw new Error('Failed to create user');
+    if (error) throw error;
+
+    if (user) {
+      // Create user profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            user_id: user.id,
+            first_name: firstName,
+            last_name: lastName,
+            status: UserStatus.PENDING
+          }
+        ]);
+
+      if (profileError) throw profileError;
     }
 
     toast({
       title: "Account Request Submitted",
-      description: "Your account has been created and is pending admin approval. You will receive an email once your account is approved."
+      description: "Your account has been created and is pending admin approval."
     });
     
     return { message: "User registration request submitted successfully" };
@@ -68,60 +70,49 @@ export const signUp = async (
   }
 };
 
-// Get pending users function
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
-    // Get current session for authentication
-    const session = await fetchAuthSession();
-    const token = session.tokens?.idToken?.toString();
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select(`
+        id,
+        user_id,
+        first_name,
+        last_name,
+        status,
+        created_at,
+        users:user_id (email)
+      `)
+      .eq('status', UserStatus.PENDING);
 
-    if (!token) {
-      throw new Error('No authentication token available');
-    }
+    if (error) throw error;
 
-    // Call Cognito API to get pending users
-    const response = await fetch(`${cognitoConfig.apiUrl}/pending-users`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch pending users');
-    }
-
-    const users = await response.json();
-    return users;
+    return profiles.map(profile => ({
+      id: profile.user_id,
+      email: profile.users.email,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      createdAt: profile.created_at,
+      status: profile.status
+    }));
   } catch (error) {
     console.error("Error fetching pending users:", error);
     return [];
   }
 };
 
-// Approve user function
 export const approveUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    const session = await fetchAuthSession();
-    const token = session.tokens?.idToken?.toString();
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ status: UserStatus.APPROVED })
+      .eq('user_id', userId);
 
-    if (!token) {
-      throw new Error('No authentication token available');
-    }
-
-    const response = await fetch(`${cognitoConfig.apiUrl}/approve-user/${userId}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to approve user');
-    }
+    if (error) throw error;
 
     toast({
       title: "User Approved",
-      description: "User has been successfully approved and notified via email."
+      description: "User has been successfully approved."
     });
     return { success: true };
   } catch (error: any) {
@@ -135,30 +126,24 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
   }
 };
 
-// Reject user function
 export const rejectUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    const session = await fetchAuthSession();
-    const token = session.tokens?.idToken?.toString();
+    // First update the status
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ status: UserStatus.REJECTED })
+      .eq('user_id', userId);
 
-    if (!token) {
-      throw new Error('No authentication token available');
-    }
+    if (updateError) throw updateError;
 
-    const response = await fetch(`${cognitoConfig.apiUrl}/reject-user/${userId}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    // Then delete the user authentication
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
 
-    if (!response.ok) {
-      throw new Error('Failed to reject user');
-    }
+    if (deleteError) throw deleteError;
 
     toast({
       title: "User Rejected",
-      description: "User has been rejected and notified via email."
+      description: "User has been rejected and removed."
     });
     return { success: true };
   } catch (error: any) {
