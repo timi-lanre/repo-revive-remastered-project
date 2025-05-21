@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
-import { SmtpClient } from "npm:smtp-client";
+import { Resend } from 'npm:resend';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-// Initialize Supabase client with service role key
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") || "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
@@ -19,21 +18,15 @@ const supabase = createClient(
   }
 );
 
-// Initialize SMTP client
-const smtpClient = new SmtpClient({
-  hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
-  port: 587,
-  username: Deno.env.get("SMTP_USERNAME"),
-  password: Deno.env.get("SMTP_PASSWORD"),
-});
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 async function sendEmail(to: string, subject: string, body: string) {
   try {
-    await smtpClient.send({
-      from: Deno.env.get("SMTP_FROM") || "noreply@advisorconnect.com",
+    await resend.emails.send({
+      from: 'Advisor Connect <noreply@advisorconnect.com>',
       to: [to],
-      subject,
-      content: body,
+      subject: subject,
+      html: body,
     });
   } catch (error) {
     console.error("Error sending email:", error);
