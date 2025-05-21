@@ -9,7 +9,7 @@ const LandingHeader = () => {
       <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto mb-2 sm:mb-0">
         <Link to="/" className="transition-transform duration-200 hover:scale-102 cursor-pointer">
           <img
-            src="/placeholder.svg" // Replace with your actual logo
+            src="/lovable-uploads/8af3a359-89c1-4bf8-a9ea-f2255c283985.png"
             alt="Advisor Connect"
             width={268}
             height={100}
