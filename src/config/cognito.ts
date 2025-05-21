@@ -1,10 +1,12 @@
-
 // AWS Cognito configuration for production authentication
 export const cognitoConfig = {
   // AWS Cognito credentials - these should match your actual user pool
   region: "ca-central-1",
   userPoolId: "ca-central-1_ZKlPFHXEq",
   userPoolWebClientId: "6qro1qfosbsjhgdj2oef9l7nj7",
+  
+  // API endpoint for custom Cognito operations
+  apiUrl: "https://your-api-endpoint.com/api",
   
   // Additional configuration for hosted UI (if needed)
   oAuthDomain: "", // Your Cognito domain if using hosted UI

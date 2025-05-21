@@ -1,6 +1,6 @@
-
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 // User status enum
 export enum UserStatus {
@@ -15,6 +15,7 @@ export interface PendingUser {
   firstName: string;
   lastName: string;
   createdAt: string;
+  status: UserStatus;
 }
 
 // User registration function
@@ -25,10 +26,34 @@ export const signUp = async (
   lastName: string
 ): Promise<{ message: string }> => {
   try {
-    // This is a stub function - implement according to requirements
+    // Create user in Cognito with custom attributes
+    const params = {
+      username: email,
+      password: password,
+      attributes: {
+        email: email,
+        given_name: firstName,
+        family_name: lastName,
+        'custom:status': UserStatus.PENDING
+      }
+    };
+
+    // Call Cognito API to create user
+    const result = await fetch(`${cognitoConfig.apiUrl}/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params)
+    });
+
+    if (!result.ok) {
+      throw new Error('Failed to create user');
+    }
+
     toast({
       title: "Account Request Submitted",
-      description: "Your account has been created and is pending admin approval."
+      description: "Your account has been created and is pending admin approval. You will receive an email once your account is approved."
     });
     
     return { message: "User registration request submitted successfully" };
@@ -43,33 +68,30 @@ export const signUp = async (
   }
 };
 
-// Get pending users function (returns mock data for UI testing)
+// Get pending users function
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
-    // Return mock data for testing the admin interface
-    return [
-      {
-        id: "user1",
-        email: "john.doe@example.com",
-        firstName: "John",
-        lastName: "Doe",
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: "user2",
-        email: "jane.smith@example.com",
-        firstName: "Jane",
-        lastName: "Smith",
-        createdAt: new Date(Date.now() - 86400000).toISOString() // 1 day ago
-      },
-      {
-        id: "user3",
-        email: "robert.johnson@example.com",
-        firstName: "Robert",
-        lastName: "Johnson",
-        createdAt: new Date(Date.now() - 172800000).toISOString() // 2 days ago
+    // Get current session for authentication
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    // Call Cognito API to get pending users
+    const response = await fetch(`${cognitoConfig.apiUrl}/pending-users`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    ];
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch pending users');
+    }
+
+    const users = await response.json();
+    return users;
   } catch (error) {
     console.error("Error fetching pending users:", error);
     return [];
@@ -79,10 +101,27 @@ export const getPendingUsers = async (): Promise<PendingUser[]> => {
 // Approve user function
 export const approveUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    // Mock implementation
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    const response = await fetch(`${cognitoConfig.apiUrl}/approve-user/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to approve user');
+    }
+
     toast({
       title: "User Approved",
-      description: "User has been successfully approved."
+      description: "User has been successfully approved and notified via email."
     });
     return { success: true };
   } catch (error: any) {
@@ -99,10 +138,27 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
 // Reject user function
 export const rejectUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    // Mock implementation
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    const response = await fetch(`${cognitoConfig.apiUrl}/reject-user/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to reject user');
+    }
+
     toast({
       title: "User Rejected",
-      description: "User has been rejected."
+      description: "User has been rejected and notified via email."
     });
     return { success: true };
   } catch (error: any) {

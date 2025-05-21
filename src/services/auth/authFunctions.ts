@@ -1,7 +1,6 @@
-
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
-import { signIn, signOut as amplifySignOut, getCurrentUser } from 'aws-amplify/auth';
+import { signIn, signOut as amplifySignOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 
 // Initialize Amplify Auth with the Cognito configuration
 const initializeAuth = () => {
@@ -21,17 +20,21 @@ export const loginWithEmailPassword = async (email: string, password: string): P
       password: password,
     });
     
-    // Store user info and tokens
-    if (signInResult) {
-      // Tokens are now handled internally by Amplify
+    if (signInResult.isSignedIn) {
       try {
+        // Get the current session to access tokens and user info
+        const session = await fetchAuthSession();
         const user = await getCurrentUser();
+        
+        // Extract groups from the ID token
+        const groups = session.tokens?.idToken?.payload['cognito:groups'] || [];
+        
         // Store user info for our app's usage
         const userInfo = {
           sub: user.userId,
           email: email,
           name: email,
-          "cognito:groups": [] // Will be populated from token claims when needed
+          "cognito:groups": groups
         };
         
         localStorage.setItem("user_info", JSON.stringify(userInfo));
@@ -40,44 +43,28 @@ export const loginWithEmailPassword = async (email: string, password: string): P
           title: "Login Successful",
           description: "You've been successfully logged in."
         });
+        
+        return { success: true };
       } catch (err) {
         console.error("Error getting user details:", err);
+        throw err;
       }
-      
-      return { success: true };
     }
     
-    throw new Error("Invalid login response");
+    throw new Error("Login failed");
   } catch (error: any) {
     console.error('Error during login:', error);
+    
+    let errorMessage = "There was an error during login.";
+    if (error.message) {
+      errorMessage = error.message;
+    }
+    
     toast({
       title: "Login Failed",
-      description: error.message || "There was an error during login.",
+      description: errorMessage,
       variant: "destructive"
     });
-    
-    // Developer account fallback for testing (remove in production)
-    if ((email === "admin@example.com" && password === "adminpassword") || 
-        (email === "admin" && password === "admin123")) {
-      
-      const adminUserInfo = {
-        sub: "admin-user-id",
-        email: email,
-        name: email === "admin@example.com" ? "Registered Admin" : "Admin User",
-        "cognito:groups": ["Admin"]
-      };
-      
-      localStorage.setItem("id_token", "admin-id-token");
-      localStorage.setItem("access_token", "admin-access-token");
-      localStorage.setItem("user_info", JSON.stringify(adminUserInfo));
-      
-      toast({
-        title: "Login Successful",
-        description: "You've been logged in as an admin."
-      });
-      
-      return { success: true };
-    }
     
     return { success: false };
   }
@@ -90,8 +77,6 @@ export const signOut = async (): Promise<void> => {
     await amplifySignOut();
     
     // Clear local storage items
-    localStorage.removeItem('id_token');
-    localStorage.removeItem('access_token');
     localStorage.removeItem('user_info');
     
     // Redirect to home page
