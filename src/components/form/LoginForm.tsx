@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -43,34 +42,29 @@ const LoginForm = () => {
     try {
       const result = await authService.signIn(data.email, data.password);
       
-      // Check if user needs admin approval
-      // In Amplify v6, we need to check for specific sign-in steps
-      if (result.nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE') {
+      // Check if user is pending approval
+      if (result.isApprovalPending) {
         toast({
           title: "Account Pending Approval",
           description: "Your account is still pending admin approval.",
         });
-      } else {
-        toast({
-          title: "Login Successful",
-          description: "Redirecting to dashboard...",
-        });
-        setTimeout(() => { navigate("/dashboard"); }, 1500);
+        return;
       }
+      
+      // If we made it here, the sign-in was successful
+      toast({
+        title: "Login Successful",
+        description: "Redirecting to dashboard...",
+      });
+      setTimeout(() => { navigate("/dashboard"); }, 1500);
+      
     } catch (error: any) {
-      if (error.code === 'UserNotConfirmedException') {
-        toast({
-          title: "Account Pending Approval",
-          description: "Your account is still pending admin approval.",
-        });
-      } else {
-        setLoginError(error.message || "Login failed. Please try again.");
-        toast({
-          title: "Login Failed",
-          description: error.message || "Please check your credentials and try again.",
-          variant: "destructive"
-        });
-      }
+      setLoginError(error.message || "Login failed. Please try again.");
+      toast({
+        title: "Login Failed",
+        description: error.message || "Please check your credentials and try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
