@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -97,5 +98,16 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Custom styles for Advisor Connect */
+@layer components {
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+  
+  .advisor-gradient {
+    background: linear-gradient(90deg, #E5D3BC 0%, #e9d9c6 100%);
   }
 }
