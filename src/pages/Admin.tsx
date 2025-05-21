@@ -1,18 +1,40 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { authService, PendingUser } from "@/services/auth";
+import { authService, PendingUser, UserStatus } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
-import { UserCheck, UserX } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { UserCheck, UserX, RefreshCcw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Admin = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [users, setUsers] = useState<PendingUser[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const loadUsers = async () => {
+    try {
+      const users = await authService.getPendingUsers();
+      setUsers(users);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load user requests.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const refreshUsers = async () => {
+    setIsRefreshing(true);
+    await loadUsers();
+    setIsRefreshing(false);
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -24,7 +46,6 @@ const Admin = () => {
           return;
         }
         
-        // Check if the user is in the Admin group
         const adminStatus = await authService.isAdmin();
         setIsAdmin(adminStatus);
         
@@ -38,9 +59,7 @@ const Admin = () => {
           return;
         }
         
-        // Load pending users using the Cognito API
-        const users = await authService.getPendingUsers();
-        setPendingUsers(users);
+        await loadUsers();
       } catch (error) {
         console.error("Error checking authentication:", error);
         toast({
@@ -58,18 +77,42 @@ const Admin = () => {
   }, [navigate]);
   
   const handleApproveUser = async (userId: string) => {
-    const result = await authService.approveUser(userId);
-    if (result.success) {
-      // Update local state to remove approved user
-      setPendingUsers(pendingUsers.filter(user => user.id !== userId));
+    try {
+      const result = await authService.approveUser(userId);
+      if (result.success) {
+        setUsers(users.filter(user => user.id !== userId));
+        toast({
+          title: "Success",
+          description: "User has been approved successfully."
+        });
+      }
+    } catch (error) {
+      console.error("Error approving user:", error);
+      toast({
+        title: "Error",
+        description: "Failed to approve user.",
+        variant: "destructive"
+      });
     }
   };
   
   const handleRejectUser = async (userId: string) => {
-    const result = await authService.rejectUser(userId);
-    if (result.success) {
-      // Update local state to remove rejected user
-      setPendingUsers(pendingUsers.filter(user => user.id !== userId));
+    try {
+      const result = await authService.rejectUser(userId);
+      if (result.success) {
+        setUsers(users.filter(user => user.id !== userId));
+        toast({
+          title: "Success",
+          description: "User has been rejected successfully."
+        });
+      }
+    } catch (error) {
+      console.error("Error rejecting user:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reject user.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -86,80 +129,118 @@ const Admin = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
   
   if (!isAdmin) {
-    return null; // Will redirect to dashboard from useEffect
+    return null;
   }
+
+  const pendingUsers = users.filter(user => user.status === UserStatus.PENDING);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <Button 
+            onClick={refreshUsers} 
+            variant="outline"
+            disabled={isRefreshing}
+          >
+            <RefreshCcw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
         
-        <Card className="shadow-lg border-gray-100">
-          <CardHeader>
-            <CardTitle>User Approval Requests</CardTitle>
-            <CardDescription>
-              Review and approve new user sign-up requests
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {pendingUsers.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>No pending approval requests</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Requested</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">
-                        {user.firstName} {user.lastName}
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{formatDate(user.createdAt)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="border-green-600 text-green-600 hover:bg-green-50"
-                            onClick={() => handleApproveUser(user.id)}
-                          >
-                            <UserCheck className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="border-red-600 text-red-600 hover:bg-red-50"
-                            onClick={() => handleRejectUser(user.id)}
-                          >
-                            <UserX className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="pending" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="pending">
+              Pending Requests
+              {pendingUsers.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {pendingUsers.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Approval Requests</CardTitle>
+                <CardDescription>
+                  Review and manage new user registration requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pendingUsers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                      <UserCheck className="h-6 w-6 text-gray-400" />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900">No Pending Requests</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      All user requests have been processed
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Requested</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              {user.firstName} {user.lastName}
+                            </TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>{formatDate(user.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="border-green-600 text-green-600 hover:bg-green-50"
+                                  onClick={() => handleApproveUser(user.id)}
+                                >
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="border-red-600 text-red-600 hover:bg-red-50"
+                                  onClick={() => handleRejectUser(user.id)}
+                                >
+                                  <UserX className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
