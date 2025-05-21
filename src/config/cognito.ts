@@ -6,7 +6,7 @@ export const cognitoConfig = {
   userPoolWebClientId: "6qro1qfosbsjhgdj2oef9l7nj7",
   
   // API endpoint for custom Cognito operations
-  apiUrl: "https://your-api-endpoint.com/api",
+  apiUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth`,
   
   // Additional configuration for hosted UI (if needed)
   oAuthDomain: "", // Your Cognito domain if using hosted UI
