@@ -44,13 +44,6 @@ export const signUp = async (
   lastName: string
 ): Promise<{ message: string }> => {
   try {
-    // First check if a user with this email already exists
-    const { data: { user: existingUser } } = await supabase.auth.admin.getUserByEmail(email);
-    
-    if (existingUser) {
-      throw new Error('An account with this email already exists. Please use a different email or try logging in.');
-    }
-
     const { data: { user }, error } = await supabase.auth.signUp({
       email,
       password,
@@ -100,37 +93,21 @@ export const signUp = async (
 
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
-    // First get all pending profiles
     const { data: profiles, error } = await supabase
       .from('user_profiles')
-      .select('user_id, first_name, last_name, status, created_at')
+      .select('user_id, first_name, last_name, status, created_at, users!inner(email)')
       .eq('status', UserStatus.PENDING);
 
     if (error) throw error;
 
-    // Get user emails from auth.users
-    const pendingUsers = await Promise.all(
-      profiles.map(async (profile) => {
-        const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(profile.user_id);
-        
-        if (userError) {
-          console.error(`Error fetching user ${profile.user_id}:`, userError);
-          return null;
-        }
-
-        return {
-          id: profile.user_id,
-          email: user?.email || '',
-          firstName: profile.first_name,
-          lastName: profile.last_name,
-          createdAt: profile.created_at,
-          status: profile.status as UserStatus
-        };
-      })
-    );
-
-    // Filter out any null values from failed user lookups
-    return pendingUsers.filter((user): user is PendingUser => user !== null);
+    return profiles.map(profile => ({
+      id: profile.user_id,
+      email: profile.users.email,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      createdAt: profile.created_at,
+      status: profile.status as UserStatus
+    }));
   } catch (error) {
     console.error("Error fetching pending users:", error);
     return [];
@@ -139,29 +116,33 @@ export const getPendingUsers = async (): Promise<PendingUser[]> => {
 
 export const approveUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    // First get the user's details for the email
+    // Get the user's profile
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name')
+      .select('first_name, users!inner(email)')
       .eq('user_id', userId)
       .single();
 
-    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+    if (!profile) throw new Error('User not found');
 
-    if (!profile || !user) throw new Error('User not found');
+    // Update the user's status through an Edge Function
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ userId }),
+    });
 
-    // Update the user's status
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ status: UserStatus.APPROVED })
-      .eq('user_id', userId);
-
-    if (error) throw error;
+    if (!response.ok) {
+      throw new Error('Failed to approve user');
+    }
 
     // Send approval email
     await sendEmail(
       'approval',
-      user.email || '',
+      profile.users.email,
       profile.first_name
     );
 
@@ -183,36 +164,35 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
 
 export const rejectUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    // First get the user's details for the email
+    // Get the user's profile
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name')
+      .select('first_name, users!inner(email)')
       .eq('user_id', userId)
       .single();
 
-    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+    if (!profile) throw new Error('User not found');
 
-    if (!profile || !user) throw new Error('User not found');
+    // Reject the user through an Edge Function
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reject-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ userId }),
+    });
 
-    // Update status to rejected
-    const { error: updateError } = await supabase
-      .from('user_profiles')
-      .update({ status: UserStatus.REJECTED })
-      .eq('user_id', userId);
-
-    if (updateError) throw updateError;
+    if (!response.ok) {
+      throw new Error('Failed to reject user');
+    }
 
     // Send rejection email
     await sendEmail(
       'rejection',
-      user.email || '',
+      profile.users.email,
       profile.first_name
     );
-
-    // Delete the user's auth account
-    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
-
-    if (deleteError) throw deleteError;
 
     toast({
       title: "User Rejected",
