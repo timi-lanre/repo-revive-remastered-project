@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services/auth';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase';
 
 const AuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
@@ -12,27 +13,11 @@ const AuthCallback = () => {
       try {
         setIsProcessing(true);
         
-        // Get token from URL if present (for OAuth flow)
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get('code');
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        // If there's a code parameter, exchange it for tokens
-        if (code) {
-          try {
-            // Handle OAuth callback with Supabase
-            const { data, error } = await authService.handleOAuthCallback(code);
-            if (error) throw error;
-            console.log("Auth session obtained:", data);
-          } catch (error) {
-            console.error("Error exchanging code for tokens:", error);
-            throw error;
-          }
-        }
+        if (error) throw error;
         
-        // Check if the user is authenticated
-        const isAuthenticated = await authService.isAuthenticated();
-        
-        if (isAuthenticated) {
+        if (session) {
           // Check if user is admin to redirect appropriately
           const isAdmin = await authService.isAdmin();
           
