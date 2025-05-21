@@ -1,4 +1,4 @@
-import { SmtpClient } from "npm:@smtp/client@latest";
+import { SmtpClient } from "npm:smtp-client";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
