@@ -13,19 +13,23 @@ const AuthCallback = () => {
       try {
         setIsProcessing(true);
         
-        // Process the callback with the current URL
-        await authService.handleCallback(window.location.href);
+        // Since we're not using OIDC anymore, we'll simply check if the user is authenticated
+        const isAuthenticated = await authService.isAuthenticated();
         
-        // Check if user is admin to redirect appropriately
-        const isAdmin = await authService.isAdmin();
-        
-        toast({
-          title: "Login Successful",
-          description: "You have been successfully logged in.",
-        });
-        
-        // Redirect based on user role
-        navigate(isAdmin ? "/admin" : "/dashboard");
+        if (isAuthenticated) {
+          // Check if user is admin to redirect appropriately
+          const isAdmin = await authService.isAdmin();
+          
+          toast({
+            title: "Login Successful",
+            description: "You have been successfully logged in.",
+          });
+          
+          // Redirect based on user role
+          navigate(isAdmin ? "/admin" : "/dashboard");
+        } else {
+          throw new Error("Authentication failed");
+        }
       } catch (error: any) {
         console.error("Auth callback error:", error);
         toast({
