@@ -41,9 +41,10 @@ const LoginForm = () => {
     setLoginError(null);
     
     try {
-      const user = await authService.signIn(data.email, data.password);
+      const result = await authService.signIn(data.email, data.password);
       
-      if (user.challengeName === 'CUSTOM_CHALLENGE') {
+      // Check if there's a custom challenge step (which would indicate pending approval)
+      if (result.nextStep.signInStep === 'CUSTOM_CHALLENGE') {
         toast({
           title: "Account Pending Approval",
           description: "Your account is still pending admin approval.",
