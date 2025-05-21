@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, UserX, RefreshCcw, LogOut } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/lib/supabase";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -15,16 +17,35 @@ const Admin = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [users, setUsers] = useState<PendingUser[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
 
   const loadUsers = async () => {
     try {
+      console.log("Admin: Loading users...");
       const users = await authService.getPendingUsers();
+      console.log("Admin: Users loaded:", users);
       setUsers(users);
-    } catch (error) {
+      
+      // Additional direct database check for debugging
+      const { data: profiles, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('status', 'PENDING');
+      
+      if (error) {
+        console.error("Direct query error:", error);
+      } else {
+        console.log("Direct query results:", profiles);
+        if (profiles?.length !== users.length) {
+          console.warn("Discrepancy between service and direct query results");
+        }
+      }
+    } catch (error: any) {
       console.error("Error loading users:", error);
+      setLoadingError(error.message || "Failed to load user requests");
       toast({
         title: "Error",
-        description: "Failed to load user requests.",
+        description: "Failed to load user requests. Please try refreshing.",
         variant: "destructive"
       });
     }
@@ -32,8 +53,13 @@ const Admin = () => {
 
   const refreshUsers = async () => {
     setIsRefreshing(true);
+    setLoadingError(null);
     await loadUsers();
     setIsRefreshing(false);
+    toast({
+      title: "Refreshed",
+      description: "User list has been refreshed."
+    });
   };
 
   const handleLogout = async () => {
@@ -74,8 +100,9 @@ const Admin = () => {
         }
         
         await loadUsers();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error checking authentication:", error);
+        setLoadingError(error.message || "Authentication error");
         toast({
           title: "Error",
           description: "There was an error loading the admin dashboard.",
@@ -187,6 +214,13 @@ const Admin = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loadingError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+            <p className="font-medium">Error loading users: {loadingError}</p>
+            <p className="text-sm mt-1">Try using the refresh button or reload the page.</p>
+          </div>
+        )}
+        
         <Tabs defaultValue="pending" className="space-y-4">
           <TabsList>
             <TabsTrigger value="pending">

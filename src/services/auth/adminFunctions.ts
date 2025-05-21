@@ -56,7 +56,10 @@ export const signUp = async (
     }
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error("Signup error:", error);
+    throw error;
+  }
 
   if (user) {
     // Create user profile
@@ -67,11 +70,15 @@ export const signUp = async (
           user_id: user.id,
           first_name: firstName,
           last_name: lastName,
+          email: email, // Store email in user profile for easier queries
           status: UserStatus.PENDING
         }
       ]);
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error("Profile creation error:", profileError);
+      throw profileError;
+    }
   }
 
   return { message: "User registration request submitted successfully" };
@@ -79,16 +86,27 @@ export const signUp = async (
 
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
+    console.log("Fetching pending users...");
+    
     const { data: profiles, error } = await supabase
       .from('user_profiles')
       .select('*')
       .eq('status', UserStatus.PENDING);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error in getPendingUsers:", error);
+      throw error;
+    }
+    
+    console.log("Fetched pending profiles:", profiles);
+
+    if (!profiles || profiles.length === 0) {
+      return [];
+    }
 
     return profiles.map(profile => ({
       id: profile.user_id,
-      email: profile.email,
+      email: profile.email || "No email available",
       firstName: profile.first_name,
       lastName: profile.last_name,
       createdAt: profile.created_at,
