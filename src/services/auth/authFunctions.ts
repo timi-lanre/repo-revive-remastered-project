@@ -1,115 +1,48 @@
 
 import { toast } from '@/components/ui/use-toast';
-import { cognitoConfig } from '@/config/cognito';
-import { getOidcClient, generateAuthParams } from './oidcClient';
 
-// Begin the login flow - redirects to Cognito's login page
-export const initiateLogin = async (): Promise<void> => {
-  try {
-    const oidcClient = await getOidcClient();
-    if (!oidcClient) {
-      throw new Error('Failed to initialize OIDC client');
-    }
-    
-    // Generate state and nonce for security
-    const { state, nonce } = generateAuthParams();
-    
-    // Store in sessionStorage for validation during callback
-    sessionStorage.setItem('auth_state', state);
-    sessionStorage.setItem('auth_nonce', nonce);
-    
-    // Get authorization URL and redirect
-    const authUrl = oidcClient.authorizationUrl({
-      scope: 'email openid profile',
-      state,
-      nonce,
-    });
-    
-    // Redirect to Cognito's login page
-    window.location.href = authUrl;
-  } catch (error: any) {
-    console.error('Error starting login flow:', error);
-    toast({
-      title: "Login Failed",
-      description: "Failed to initialize OIDC client. Please try again later.",
-      variant: "destructive"
-    });
-    throw error;
-  }
-};
-
-// New function for registered admin login with email and password
+// Simplified login with email and password
 export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
   try {
-    // This is a simplified mock implementation for the registered admin login
-    // In a real app, this would validate against a database or auth provider
+    // This is a simplified mock implementation for admin login
+    // In a real app, this would validate against a database
     
-    // Check if credentials match your pre-registered admin user
-    // Replace these with your actual registered admin credentials
-    if (email === "admin@example.com" && password === "adminpassword") {
-      // Set up the admin user info and tokens
+    // You can modify these hardcoded credentials to match your actual admin details
+    if ((email === "admin@example.com" && password === "adminpassword") || 
+        (email === "admin" && password === "admin123")) {
+      
+      // Set up the admin user info
       const adminUserInfo = {
-        sub: "registered-admin-id",
+        sub: "admin-user-id",
         email: email,
-        name: "Registered Admin",
+        name: email === "admin@example.com" ? "Registered Admin" : "Admin User",
         "cognito:groups": ["Admin"]
       };
       
-      localStorage.setItem("id_token", "registered-admin-id-token");
-      localStorage.setItem("access_token", "registered-admin-access-token");
+      localStorage.setItem("id_token", "admin-id-token");
+      localStorage.setItem("access_token", "admin-access-token");
       localStorage.setItem("user_info", JSON.stringify(adminUserInfo));
+      
+      toast({
+        title: "Login Successful",
+        description: "You've been logged in as an admin."
+      });
       
       return { success: true };
     }
     
+    toast({
+      title: "Login Failed",
+      description: "Invalid email or password.",
+      variant: "destructive"
+    });
+    
     return { success: false };
   } catch (error: any) {
     console.error('Error during login:', error);
-    throw error;
-  }
-};
-
-// Handle the callback from Cognito after login
-export const handleCallback = async (callbackUrl: string) => {
-  try {
-    const oidcClient = await getOidcClient();
-    
-    // Get the stored state and nonce
-    const state = sessionStorage.getItem('auth_state');
-    const nonce = sessionStorage.getItem('auth_nonce');
-    
-    if (!state || !nonce) {
-      throw new Error('Missing authentication state');
-    }
-    
-    // Parse the callback parameters
-    const params = oidcClient.callbackParams(callbackUrl);
-    
-    // Exchange the code for tokens
-    const tokenSet = await oidcClient.callback(
-      window.location.origin + '/callback',
-      params,
-      { state, nonce }
-    );
-    
-    // Get user info from the access token
-    const userInfo = await oidcClient.userinfo(tokenSet.access_token!);
-    
-    // Store tokens and user info in localStorage
-    localStorage.setItem('id_token', tokenSet.id_token!);
-    localStorage.setItem('access_token', tokenSet.access_token!);
-    localStorage.setItem('user_info', JSON.stringify(userInfo));
-    
-    // Clean up state and nonce
-    sessionStorage.removeItem('auth_state');
-    sessionStorage.removeItem('auth_nonce');
-    
-    return { userInfo, tokenSet };
-  } catch (error: any) {
-    console.error('Error handling authentication callback:', error);
     toast({
-      title: "Authentication Failed",
-      description: error.message || "There was an error completing the login process.",
+      title: "Login Failed",
+      description: error.message || "There was an error during login.",
       variant: "destructive"
     });
     throw error;
@@ -119,19 +52,13 @@ export const handleCallback = async (callbackUrl: string) => {
 // Sign out function
 export const signOut = async (): Promise<void> => {
   try {
-    const oidcClient = await getOidcClient();
-    
     // Clear tokens and user info
     localStorage.removeItem('id_token');
     localStorage.removeItem('access_token');
     localStorage.removeItem('user_info');
     
-    // Construct logout URL
-    const cognitoRegion = cognitoConfig.userPoolId.split('_')[0];
-    const logoutUrl = `https://${cognitoRegion}.auth.${cognitoConfig.region}.amazoncognito.com/logout?client_id=${cognitoConfig.userPoolWebClientId}&logout_uri=${encodeURIComponent(window.location.origin)}`;
-    
-    // Redirect to logout URL
-    window.location.href = logoutUrl;
+    // Redirect to home page
+    window.location.href = "/";
   } catch (error: any) {
     console.error('Error signing out:', error);
     throw error;
