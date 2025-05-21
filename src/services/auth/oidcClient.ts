@@ -1,14 +1,14 @@
 
-import * as OpenidClient from 'openid-client';
+import { Issuer } from 'openid-client';
 import { cognitoConfig } from '@/config/cognito';
 
 // We'll store the OpenID client here
-let oidcClient: OpenidClient.Client | null = null;
+let oidcClient: any = null;
 
 // Initialize the OpenID client
-export async function initializeOidcClient(): Promise<OpenidClient.Client | null> {
+export async function initializeOidcClient(): Promise<any> {
   try {
-    const issuer = await OpenidClient.Issuer.discover(`https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}`);
+    const issuer = await Issuer.discover(`https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}`);
     
     // Create client
     oidcClient = new issuer.Client({
@@ -27,7 +27,7 @@ export async function initializeOidcClient(): Promise<OpenidClient.Client | null
 }
 
 // Get or initialize OIDC client
-export async function getOidcClient(): Promise<OpenidClient.Client> {
+export async function getOidcClient(): Promise<any> {
   if (!oidcClient) {
     await initializeOidcClient();
     if (!oidcClient) {
@@ -39,8 +39,9 @@ export async function getOidcClient(): Promise<OpenidClient.Client> {
 
 // Generate nonce and state for authentication
 export function generateAuthParams() {
-  const state = OpenidClient.generators.state();
-  const nonce = OpenidClient.generators.nonce();
+  const { generators } = require('openid-client');
+  const state = generators.state();
+  const nonce = generators.nonce();
   
   return { state, nonce };
 }
