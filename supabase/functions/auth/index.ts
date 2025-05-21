@@ -1,5 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
-import { Resend } from 'npm:resend';
+import { 
+  SESClient, 
+  SendEmailCommand,
+  SendEmailCommandInput 
+} from "npm:@aws-sdk/client-ses";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,23 +22,47 @@ const supabase = createClient(
   }
 );
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const sesClient = new SESClient({
+  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  credentials: {
+    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
+    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
+  },
+});
 
 async function sendEmail(to: string, subject: string, body: string) {
   try {
-    await resend.emails.send({
-      from: 'Advisor Connect <noreply@advisorconnect.com>',
-      to: [to],
-      subject: subject,
-      html: body,
-    });
+    const params: SendEmailCommandInput = {
+      Source: "noreply@advisorconnect.com",
+      Destination: {
+        ToAddresses: [to],
+      },
+      Message: {
+        Subject: {
+          Data: subject,
+          Charset: "UTF-8",
+        },
+        Body: {
+          Text: {
+            Data: body,
+            Charset: "UTF-8",
+          },
+          Html: {
+            Data: body.replace(/\n/g, "<br>"),
+            Charset: "UTF-8",
+          },
+        },
+      },
+    };
+
+    const command = new SendEmailCommand(params);
+    await sesClient.send(command);
   } catch (error) {
     console.error("Error sending email:", error);
   }
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -46,11 +74,9 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname.replace("/auth", "");
 
-    // Sign up endpoint
     if (path === "/signup" && req.method === "POST") {
       const { email, password, firstName, lastName } = await req.json();
 
-      // First check if user exists
       const { data: existingUser } = await supabase
         .from('user_profiles')
         .select('user_id')
@@ -61,7 +87,6 @@ Deno.serve(async (req) => {
         throw new Error("User already exists");
       }
 
-      // Create auth user
       const { data: { user }, error: authError } = await supabase.auth.admin.createUser({
         email,
         password,
@@ -75,7 +100,6 @@ Deno.serve(async (req) => {
       if (authError) throw authError;
       if (!user) throw new Error("Failed to create user");
 
-      // Create user profile
       const { error: profileError } = await supabase
         .from('user_profiles')
         .insert([
@@ -89,7 +113,6 @@ Deno.serve(async (req) => {
         ]);
 
       if (profileError) {
-        // Rollback: delete auth user if profile creation fails
         await supabase.auth.admin.deleteUser(user.id);
         throw profileError;
       }
@@ -103,7 +126,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get pending users endpoint
     if (path === "/pending-users" && req.method === "GET") {
       const { data: profiles, error } = await supabase
         .from('user_profiles')
@@ -132,7 +154,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Approve user endpoint
     if (path.startsWith("/approve-user/") && req.method === "POST") {
       const userId = path.split("/").pop();
       
@@ -143,7 +164,6 @@ Deno.serve(async (req) => {
 
       if (updateError) throw updateError;
 
-      // Get user details for email
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('first_name')
@@ -169,11 +189,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Reject user endpoint
     if (path.startsWith("/reject-user/") && req.method === "POST") {
       const userId = path.split("/").pop();
 
-      // Update profile status
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({ status: "REJECTED" })
@@ -181,7 +199,6 @@ Deno.serve(async (req) => {
 
       if (updateError) throw updateError;
 
-      // Get user details for email
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('first_name')
@@ -207,7 +224,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Reset password endpoint
     if (path.startsWith("/reset-password/") && req.method === "POST") {
       const userId = path.split("/").pop();
       
