@@ -59,28 +59,38 @@ const Login = () => {
       email: "",
       password: "",
       confirmPassword: "",
-      acceptTerms: false,
+      acceptTerms: false, // This should be false by default, we'll modify the validation below
     },
   });
 
   const onLoginSubmit = (data: LoginFormValues) => {
-    // In a real app, you would handle authentication with AWS Cognito here
     console.log("Login data:", data);
+    
+    // This is where you would integrate with AWS Cognito
+    // For example: Auth.signIn(data.email, data.password)
     
     toast({
       title: "Login Successful",
       description: "Redirecting to dashboard...",
     });
     
-    // Simulate a redirect after login
     setTimeout(() => {
       navigate("/dashboard");
     }, 1500);
   };
 
   const onSignupSubmit = (data: SignupFormValues) => {
-    // In a real app, you would handle registration with AWS Cognito here
     console.log("Signup data:", data);
+    
+    // This is where you would integrate with AWS Cognito
+    // For example: Auth.signUp({
+    //   username: data.email,
+    //   password: data.password,
+    //   attributes: {
+    //     given_name: data.firstName,
+    //     family_name: data.lastName,
+    //   }
+    // })
     
     toast({
       title: "Account Created",
