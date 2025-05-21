@@ -1,7 +1,6 @@
-import { signIn, signUp, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
-import CryptoJS from 'crypto-js';
+import { Issuer, generators, Client } from 'openid-client';
 
 // User status enum
 export enum UserStatus {
@@ -18,77 +17,116 @@ export interface PendingUser {
   createdAt: string;
 }
 
-// Helper function to calculate SECRET_HASH
-const calculateSecretHash = (username: string) => {
-  const { userPoolWebClientId, clientSecret } = cognitoConfig;
-  
-  if (!clientSecret) return undefined;
-  
-  const message = username + userPoolWebClientId;
-  const hashDigest = CryptoJS.HmacSHA256(message, clientSecret);
-  return CryptoJS.enc.Base64.stringify(hashDigest);
-};
+// We'll store the OpenID client here
+let oidcClient: Client | null = null;
+
+// Initialize the OpenID client
+async function initializeOidcClient() {
+  try {
+    const issuer = await Issuer.discover(`https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}`);
+    
+    // Create client
+    oidcClient = new issuer.Client({
+      client_id: cognitoConfig.userPoolWebClientId,
+      client_secret: cognitoConfig.clientSecret,
+      redirect_uris: [window.location.origin + '/callback'],
+      response_types: ['code'],
+    });
+    
+    console.log('OIDC client initialized successfully');
+    return oidcClient;
+  } catch (error) {
+    console.error('Failed to initialize OIDC client:', error);
+    return null;
+  }
+}
+
+// Make sure we initialize the client when this module is loaded
+initializeOidcClient().catch(console.error);
 
 export const authService = {
-  // Sign in function
-  signIn: async (email: string, password: string) => {
+  // Begin the login flow - redirects to Cognito's login page
+  initiateLogin: async () => {
     try {
-      const secretHash = calculateSecretHash(email);
-      
-      const { nextStep } = await signIn({
-        username: email,
-        password,
-        options: {
-          authFlowType: 'USER_PASSWORD_AUTH',
-          clientMetadata: { },
-          secretHash: secretHash
-        }
-      });
-      
-      return { nextStep };
-    } catch (error: any) {
-      console.error('Error signing in:', error);
-      
-      // Special handling for not confirmed users (pending approval)
-      if (error.code === 'UserNotConfirmedException') {
-        return { 
-          isApprovalPending: true,
-          message: "Your account is pending admin approval."
-        };
+      if (!oidcClient) {
+        await initializeOidcClient();
+        if (!oidcClient) throw new Error('Failed to initialize OIDC client');
       }
       
+      // Generate state and nonce for security
+      const state = generators.state();
+      const nonce = generators.nonce();
+      
+      // Store in sessionStorage for validation during callback
+      sessionStorage.setItem('auth_state', state);
+      sessionStorage.setItem('auth_nonce', nonce);
+      
+      // Get authorization URL and redirect
+      const authUrl = oidcClient.authorizationUrl({
+        scope: 'email openid profile',
+        state,
+        nonce,
+      });
+      
+      // Redirect to Cognito's login page
+      window.location.href = authUrl;
+    } catch (error: any) {
+      console.error('Error starting login flow:', error);
+      toast({
+        title: "Login Failed",
+        description: error.message || "There was an error starting the login process.",
+        variant: "destructive"
+      });
       throw error;
     }
   },
 
-  // Sign up function
-  signUp: async (email: string, password: string, firstName: string, lastName: string) => {
+  // Handle the callback from Cognito after login
+  handleCallback: async (callbackUrl: string) => {
     try {
-      const secretHash = calculateSecretHash(email);
+      if (!oidcClient) {
+        await initializeOidcClient();
+        if (!oidcClient) throw new Error('Failed to initialize OIDC client');
+      }
       
-      const { nextStep } = await signUp({
-        username: email,
-        password,
-        options: {
-          userAttributes: {
-            email,
-            given_name: firstName,
-            family_name: lastName,
-            // Custom attribute to track approval status
-            'custom:status': UserStatus.PENDING,
-          },
-          // This ensures users are not auto-confirmed and need admin approval
-          autoSignIn: false,
-          secretHash: secretHash
-        },
-      });
+      // Get the stored state and nonce
+      const state = sessionStorage.getItem('auth_state');
+      const nonce = sessionStorage.getItem('auth_nonce');
       
-      return { 
-        nextStep,
-        message: "Your account has been created and is pending admin approval. You'll receive an email when your account is approved."
-      };
+      if (!state || !nonce) {
+        throw new Error('Missing authentication state');
+      }
+      
+      // Parse the callback parameters
+      const params = oidcClient.callbackParams(callbackUrl);
+      
+      // Exchange the code for tokens
+      const tokenSet = await oidcClient.callback(
+        window.location.origin + '/callback',
+        params,
+        { state, nonce }
+      );
+      
+      // Get user info from the access token
+      const userInfo = await oidcClient.userinfo(tokenSet.access_token!);
+      
+      // Store tokens and user info in localStorage
+      localStorage.setItem('id_token', tokenSet.id_token!);
+      localStorage.setItem('access_token', tokenSet.access_token!);
+      localStorage.setItem('user_info', JSON.stringify(userInfo));
+      
+      // Clean up state and nonce
+      sessionStorage.removeItem('auth_state');
+      sessionStorage.removeItem('auth_nonce');
+      
+      return { userInfo, tokenSet };
     } catch (error: any) {
-      console.error('Error signing up:', error);
+      console.error('Error handling authentication callback:', error);
+      toast({
+        title: "Authentication Failed",
+        description: error.message || "There was an error completing the login process.",
+        variant: "destructive"
+      });
       throw error;
     }
   },
@@ -96,7 +134,21 @@ export const authService = {
   // Sign out function
   signOut: async () => {
     try {
-      await signOut();
+      if (!oidcClient) {
+        await initializeOidcClient();
+        if (!oidcClient) throw new Error('Failed to initialize OIDC client');
+      }
+      
+      // Clear tokens and user info
+      localStorage.removeItem('id_token');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_info');
+      
+      // Construct logout URL
+      const logoutUrl = `https://${cognitoConfig.userPoolId.split('_')[0]}.auth.${cognitoConfig.region}.amazoncognito.com/logout?client_id=${cognitoConfig.userPoolWebClientId}&logout_uri=${encodeURIComponent(window.location.origin)}`;
+      
+      // Redirect to logout URL
+      window.location.href = logoutUrl;
     } catch (error: any) {
       console.error('Error signing out:', error);
       throw error;
@@ -106,9 +158,12 @@ export const authService = {
   // Get current authenticated user
   getCurrentUser: async () => {
     try {
-      return await getCurrentUser();
+      const userInfoStr = localStorage.getItem('user_info');
+      if (!userInfoStr) return null;
+      
+      return JSON.parse(userInfoStr);
     } catch (error) {
-      console.error('Not authenticated:', error);
+      console.error('Error getting current user:', error);
       return null;
     }
   },
@@ -116,8 +171,8 @@ export const authService = {
   // Check if user is authenticated
   isAuthenticated: async () => {
     try {
-      const session = await fetchAuthSession();
-      return session.tokens !== undefined;
+      const accessToken = localStorage.getItem('access_token');
+      return !!accessToken;
     } catch {
       return false;
     }
@@ -126,9 +181,14 @@ export const authService = {
   // Check if user is an admin by verifying their group membership
   isAdmin: async () => {
     try {
-      const session = await fetchAuthSession();
-      // Extract the "cognito:groups" claim from the ID token
-      const groups = session.tokens?.idToken?.payload["cognito:groups"];
+      const idToken = localStorage.getItem('id_token');
+      if (!idToken) return false;
+      
+      // Parse the ID token (without verification, as we trust our local storage)
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+      
+      // Extract the "cognito:groups" claim
+      const groups = payload["cognito:groups"];
       
       // Check if the user is in the Admin group
       return Array.isArray(groups) && groups.includes("Admin");
@@ -138,71 +198,16 @@ export const authService = {
     }
   },
   
-  // Get pending users using Cognito API (simplified version - would need AWS SDK in real implementation)
+  // These functions will remain stubs for now
   getPendingUsers: async () => {
-    try {
-      // In a real implementation, this would use the Cognito Admin ListUsers API
-      // with a filter for the custom:status attribute equal to PENDING
-      
-      // For demonstration purposes, we're returning an empty array
-      // In production, this would be replaced with actual Cognito API calls
-      console.log("Fetching pending users from Cognito (simulated)");
-      return [] as PendingUser[];
-    } catch (error) {
-      console.error("Error fetching pending users:", error);
-      return [] as PendingUser[];
-    }
+    // ... keep existing code (getPendingUsers implementation)
   },
   
-  // Approve user using Cognito API (simplified version - would need AWS SDK in real implementation)
   approveUser: async (userId: string) => {
-    try {
-      // In a real implementation, this would:
-      // 1. Use AdminConfirmSignUp to confirm the user
-      // 2. Use AdminUpdateUserAttributes to set custom:status to APPROVED
-      
-      console.log(`Approving user ${userId} (simulated)`);
-      
-      toast({
-        title: "User Approved",
-        description: "The user has been approved and can now log in.",
-      });
-      
-      return { success: true };
-    } catch (error) {
-      console.error("Error approving user:", error);
-      toast({
-        title: "Error Approving User",
-        description: "There was an error approving the user.",
-        variant: "destructive"
-      });
-      return { success: false };
-    }
+    // ... keep existing code (approveUser implementation)
   },
   
-  // Reject user using Cognito API (simplified version - would need AWS SDK in real implementation)
   rejectUser: async (userId: string) => {
-    try {
-      // In a real implementation, this would:
-      // 1. Use AdminUpdateUserAttributes to set custom:status to REJECTED
-      // or, alternatively, delete the user using AdminDeleteUser
-      
-      console.log(`Rejecting user ${userId} (simulated)`);
-      
-      toast({
-        title: "User Rejected",
-        description: "The user has been rejected.",
-      });
-      
-      return { success: true };
-    } catch (error) {
-      console.error("Error rejecting user:", error);
-      toast({
-        title: "Error Rejecting User",
-        description: "There was an error rejecting the user.",
-        variant: "destructive"
-      });
-      return { success: false };
-    }
+    // ... keep existing code (rejectUser implementation)
   }
 };

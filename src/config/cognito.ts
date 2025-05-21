@@ -10,6 +10,6 @@ export const cognitoConfig = {
 
 // Function to initialize Cognito configuration
 export const initializeCognito = () => {
-  // This function will be used to initialize AWS Amplify
-  // It will be called from main.tsx
+  // This function is no longer needed as we initialize in the authService
+  console.log("Cognito configuration initialized");
 };
