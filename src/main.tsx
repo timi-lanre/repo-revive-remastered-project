@@ -12,6 +12,11 @@ Amplify.configure({
       userPoolId: cognitoConfig.userPoolId,
       userPoolClientId: cognitoConfig.userPoolWebClientId,
       signUpVerificationMethod: 'code',
+      loginWith: {
+        email: true,
+        username: false,
+        phone: false
+      }
     }
   },
 });

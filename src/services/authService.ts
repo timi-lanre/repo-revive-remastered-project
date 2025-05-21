@@ -1,4 +1,3 @@
-
 import { signIn, signUp, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
@@ -41,9 +40,8 @@ export const authService = {
         password,
         options: {
           authFlowType: 'USER_PASSWORD_AUTH',
-          clientMetadata: {
-            ...(secretHash && { SECRET_HASH: secretHash })
-          }
+          clientMetadata: { },
+          secretHash: secretHash
         }
       });
       
@@ -81,9 +79,7 @@ export const authService = {
           },
           // This ensures users are not auto-confirmed and need admin approval
           autoSignIn: false,
-          clientMetadata: {
-            ...(secretHash && { SECRET_HASH: secretHash })
-          }
+          secretHash: secretHash
         },
       });
       
