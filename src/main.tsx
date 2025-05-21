@@ -11,7 +11,7 @@ Amplify.configure({
     Cognito: {
       userPoolId: cognitoConfig.userPoolId,
       userPoolClientId: cognitoConfig.userPoolWebClientId,
-      region: cognitoConfig.region,
+      signUpVerificationMethod: 'code',
     }
   },
 });

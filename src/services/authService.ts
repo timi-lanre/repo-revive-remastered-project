@@ -1,4 +1,3 @@
-
 import { signIn, signUp, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 
 export const authService = {
@@ -10,7 +9,6 @@ export const authService = {
         password,
       });
       
-      // Check if there's a next step (like custom challenge for admin approval)
       return { nextStep };
     } catch (error: any) {
       console.error('Error signing in:', error);

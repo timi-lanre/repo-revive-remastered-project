@@ -43,8 +43,9 @@ const LoginForm = () => {
     try {
       const result = await authService.signIn(data.email, data.password);
       
-      // Check if there's a custom challenge step (which would indicate pending approval)
-      if (result.nextStep.signInStep === 'CUSTOM_CHALLENGE') {
+      // Check if user needs admin approval
+      // In Amplify v6, we need to check for specific sign-in steps
+      if (result.nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE') {
         toast({
           title: "Account Pending Approval",
           description: "Your account is still pending admin approval.",
