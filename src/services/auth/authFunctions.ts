@@ -1,24 +1,16 @@
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
 import { signIn, signOut as amplifySignOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
-import { CryptoJS } from 'crypto-js';
 
 // Production-ready login with email and password using Amplify Auth
 export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
   try {
-    // Calculate SECRET_HASH
-    const message = email + cognitoConfig.userPoolWebClientId;
-    const hash = CryptoJS.HmacSHA256(message, cognitoConfig.clientSecret);
-    const secretHash = hash.toString(CryptoJS.enc.Base64);
-
-    // Sign in using Amplify Auth
+    // Sign in using Amplify Auth with USER_PASSWORD_AUTH flow
     const signInResult = await signIn({
       username: email,
       password: password,
       options: {
-        clientMetadata: {
-          SECRET_HASH: secretHash
-        }
+        authFlowType: "USER_PASSWORD_AUTH"
       }
     });
     
