@@ -41,10 +41,20 @@ serve(async (req) => {
           { Name: "given_name", Value: firstName },
           { Name: "family_name", Value: lastName },
           { Name: "custom:status", Value: "PENDING" },
+          { Name: "email_verified", Value: "true" }, // Auto-verify email
         ],
+        MessageAction: "SUPPRESS", // Suppress welcome email
       };
 
       await cognitoClient.adminCreateUser(params);
+
+      // Set permanent password
+      await cognitoClient.adminSetUserPassword({
+        UserPoolId: Deno.env.get("COGNITO_USER_POOL_ID"),
+        Username: email,
+        Password: password,
+        Permanent: true,
+      });
 
       return new Response(
         JSON.stringify({ message: "User created successfully" }),
