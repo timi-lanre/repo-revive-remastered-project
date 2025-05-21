@@ -43,32 +43,18 @@ const Admin = () => {
         
       if (error) throw error;
       
-      console.log('Found profiles:', profiles); // Debug log
+      // Transform the profiles into the required format
+      const usersWithEmail = profiles.map(profile => ({
+        id: profile.user_id,
+        email: profile.email || 'No email available', // Email should be stored in user_profiles
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        status: profile.status,
+        role: profile.role,
+        createdAt: profile.created_at
+      }));
       
-      const usersWithEmail = await Promise.all(
-        profiles.map(async (profile) => {
-          const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(profile.user_id);
-          if (userError) {
-            console.error('Error fetching user:', userError); // Debug log
-            return null;
-          }
-          console.log('Found user:', user); // Debug log
-          return {
-            id: profile.user_id,
-            email: user?.email || 'No email available',
-            firstName: profile.first_name,
-            lastName: profile.last_name,
-            status: profile.status,
-            role: profile.role,
-            createdAt: profile.created_at
-          };
-        })
-      );
-      
-      const validUsers = usersWithEmail.filter(user => user !== null) as UserProfile[];
-      console.log('Final user list:', validUsers); // Debug log
-      
-      setAllUsers(validUsers);
+      setAllUsers(usersWithEmail);
     } catch (error: any) {
       console.error("Error loading users:", error);
       setLoadingError(error.message || "Failed to load users");
