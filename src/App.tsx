@@ -10,8 +10,22 @@ import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./components/auth/AuthCallback";
+import { useEffect } from "react";
+import { cognitoConfig } from "./config/cognito";
+import { Amplify } from "aws-amplify";
 
 const queryClient = new QueryClient();
+
+// Configure Amplify
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      region: cognitoConfig.region,
+      userPoolId: cognitoConfig.userPoolId,
+      userPoolClientId: cognitoConfig.userPoolWebClientId
+    }
+  }
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

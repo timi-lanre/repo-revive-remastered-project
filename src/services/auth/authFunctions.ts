@@ -1,18 +1,12 @@
 
 import { toast } from '@/components/ui/use-toast';
 import { cognitoConfig } from '@/config/cognito';
-import { Auth } from 'aws-amplify';
+import { signIn, signOut as amplifySignOut, getCurrentUser } from 'aws-amplify/auth';
 
 // Initialize Amplify Auth with the Cognito configuration
 const initializeAuth = () => {
-  if (!Auth.configure) return;
-
-  Auth.configure({
-    region: cognitoConfig.region,
-    userPoolId: cognitoConfig.userPoolId,
-    userPoolWebClientId: cognitoConfig.userPoolWebClientId,
-    authenticationFlowType: 'USER_PASSWORD_AUTH',
-  });
+  // Configuration now happens in main.tsx or App.tsx
+  // No need to call configure here anymore in Amplify v6+
 };
 
 // Call initialize on module import
@@ -22,26 +16,33 @@ initializeAuth();
 export const loginWithEmailPassword = async (email: string, password: string): Promise<{ success: boolean }> => {
   try {
     // Sign in using Amplify Auth
-    const user = await Auth.signIn(email, password);
+    const signInResult = await signIn({
+      username: email,
+      password: password,
+    });
     
     // Store user info and tokens
-    if (user) {
-      // Storing tokens is handled by Amplify Auth
-      
-      // Store user info for our app's usage
-      const userInfo = {
-        sub: user.username || user.attributes?.sub,
-        email: user.attributes?.email || email,
-        name: user.attributes?.name || email,
-        "cognito:groups": user.signInUserSession?.accessToken?.payload["cognito:groups"] || []
-      };
-      
-      localStorage.setItem("user_info", JSON.stringify(userInfo));
-      
-      toast({
-        title: "Login Successful",
-        description: "You've been successfully logged in."
-      });
+    if (signInResult) {
+      // Tokens are now handled internally by Amplify
+      try {
+        const user = await getCurrentUser();
+        // Store user info for our app's usage
+        const userInfo = {
+          sub: user.userId,
+          email: email,
+          name: email,
+          "cognito:groups": [] // Will be populated from token claims when needed
+        };
+        
+        localStorage.setItem("user_info", JSON.stringify(userInfo));
+        
+        toast({
+          title: "Login Successful",
+          description: "You've been successfully logged in."
+        });
+      } catch (err) {
+        console.error("Error getting user details:", err);
+      }
       
       return { success: true };
     }
@@ -86,7 +87,7 @@ export const loginWithEmailPassword = async (email: string, password: string): P
 export const signOut = async (): Promise<void> => {
   try {
     // Sign out from Cognito
-    await Auth.signOut();
+    await amplifySignOut();
     
     // Clear local storage items
     localStorage.removeItem('id_token');
