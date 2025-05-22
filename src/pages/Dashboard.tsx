@@ -89,7 +89,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
       ? value.filter(v => v !== option)
       : [...value, option];
     onChange(newValue);
-    // Removed the closing of dropdown here to keep it open after selection
+    // Keep dropdown open - don't close it
   };
 
   const handleRemove = (option: string, e?: React.MouseEvent) => {
@@ -111,6 +111,18 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
       e.stopPropagation();
     }
     onChange([...options]);
+  };
+
+  // Handle option click - prevent dropdown from closing
+  const handleOptionClick = (option: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleToggle(option);
+  };
+
+  // Handle checkbox change - prevent dropdown from closing
+  const handleCheckboxChange = (option: string) => {
+    handleToggle(option);
   };
 
   const allSelected = options.length > 0 && value.length === options.length;
@@ -193,11 +205,13 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                   <div
                     key={option}
                     className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
-                    onClick={() => handleToggle(option)} // Removed stopPropagation here
+                    onClick={(e) => handleOptionClick(option, e)}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
                   >
                     <Checkbox
                       checked={value.includes(option)}
-                      onCheckedChange={() => handleToggle(option)}
+                      onCheckedChange={() => handleCheckboxChange(option)}
+                      onClick={(e) => e.stopPropagation()} // Prevent double toggle
                     />
                     <span className="text-sm">{option}</span>
                   </div>
