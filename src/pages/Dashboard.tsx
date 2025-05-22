@@ -525,7 +525,11 @@ const Dashboard = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div ref={tableContainerRef} style={{ height: 'calc(13 * 53px + 48px)' }} className="overflow-auto">
+          <div 
+            ref={tableContainerRef} 
+            style={{ height: 'calc(13 * 53px + 53px)' }}
+            className="overflow-auto"
+          >
             <table className="w-full border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
