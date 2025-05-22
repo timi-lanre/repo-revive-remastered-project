@@ -96,13 +96,13 @@ const Admin = () => {
       await authService.resetPassword(userId);
       toast({
         title: "Success",
-        description: `Password reset email sent to ${email}`
+        description: `Password reset email sent to ${email}. Please check your inbox.`,
       });
     } catch (error) {
       console.error("Error resetting password:", error);
       toast({
         title: "Error",
-        description: "Failed to reset password",
+        description: "Failed to send password reset email. Please try again.",
         variant: "destructive"
       });
     }
