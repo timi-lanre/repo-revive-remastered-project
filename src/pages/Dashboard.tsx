@@ -527,8 +527,11 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div 
             ref={tableContainerRef} 
-            style={{ height: 'calc(13 * 53px + 53px)' }}
             className="overflow-auto"
+            style={{ 
+              height: 'calc(13 * 53px + 53px)',
+              maxHeight: 'calc(100vh - 400px)'
+            }}
           >
             <table className="w-full border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
@@ -568,7 +571,11 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
-                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ height: '53px' }}>
+                  <tr 
+                    key={advisor.id} 
+                    className="hover:bg-gray-50" 
+                    style={{ height: '53px' }}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {advisor.firstName}
                     </td>
