@@ -44,4 +44,4 @@ const LandingHeader = () => {
   );
 };
 
-export default LandingHeader
+export default LandingHeader;
