@@ -1,3 +1,4 @@
+
 // src/components/admin/CreateUserForm.tsx
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
@@ -7,34 +8,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { authService } from "@/services/auth";
 import { Loader2, CheckCircle } from "lucide-react";
+import FormErrorAlert from '@/components/form/FormErrorAlert';
 
 const CreateUserForm = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     // Basic validation
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all fields.",
-        variant: "destructive"
-      });
+      setError("Please fill in all required fields.");
       return;
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address.",
-        variant: "destructive"
-      });
+      setError("Please enter a valid email address.");
       return;
     }
 
@@ -48,7 +44,7 @@ const CreateUserForm = () => {
       if (result.success) {
         toast({
           title: "User Created Successfully",
-          description: `User ${firstName} ${lastName} has been created and an email has been sent to ${email} with login instructions.`
+          description: `User ${firstName} ${lastName} has been created. An email with login credentials has been sent to ${email}.`
         });
         
         // Reset form
@@ -76,11 +72,7 @@ const CreateUserForm = () => {
         }
       }
       
-      toast({
-        title: "Error Creating User",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -95,6 +87,8 @@ const CreateUserForm = () => {
         </p>
       </CardHeader>
       <CardContent>
+        {error && <FormErrorAlert error={error} />}
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

@@ -18,76 +18,18 @@ const generateRandomPassword = (length = 12) => {
   return password;
 };
 
-const sendEmail = async (type: 'account_created', email: string, firstName: string, password?: string) => {
-  try {
-    console.log('Sending email:', { type, email, firstName });
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({ 
-        type, 
-        email, 
-        firstName, 
-        password,
-        loginUrl: 'https://advisorconnect.ca/login'
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Email API response:', errorText);
-      throw new Error('Failed to send email notification');
-    }
-    
-    console.log('Email sent successfully');
-  } catch (error) {
-    console.error('Error sending email:', error);
-    // Don't throw here - we don't want email failures to prevent user creation
-  }
-};
-
 export const createUser = async (
   firstName: string, 
   lastName: string, 
   email: string
 ): Promise<{ success: boolean }> => {
   try {
-    // Check if user already exists in auth.users
-    const { data: existingAuthUsers, error: authCheckError } = await supabase.auth.admin.listUsers();
+    console.log('Creating user via Edge Function:', { firstName, lastName, email });
     
-    if (authCheckError) {
-      console.error('Error checking existing auth users:', authCheckError);
-      throw new Error(`Failed to check existing users: ${authCheckError.message}`);
-    }
-
-    const existingAuthUser = existingAuthUsers.users.find(user => user.email === email);
-    if (existingAuthUser) {
-      throw new Error("A user with this email already exists");
-    }
-
-    // Check if user exists in profiles table
-    const { data: existingProfile, error: profileCheckError } = await supabase
-      .from('user_profiles')
-      .select('user_id')
-      .eq('email', email)
-      .maybeSingle();
-      
-    if (profileCheckError) {
-      console.error('Error checking existing profile:', profileCheckError);
-      throw new Error(`Database error: ${profileCheckError.message}`);
-    }
-
-    if (existingProfile) {
-      throw new Error("A user with this email already exists");
-    }
-
     // Generate a random password
     const password = generateRandomPassword();
     
-    // Create user via the Edge Function
+    // Create user via the Edge Function - this handles all checks and creation in one call
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/create-user`, {
       method: 'POST',
       headers: {
@@ -103,9 +45,9 @@ export const createUser = async (
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response from create-user function:', errorText);
-      throw new Error(`Failed to create user: ${errorText}`);
+      const errorData = await response.json();
+      console.error('Error response from create-user function:', errorData);
+      throw new Error(errorData.error || 'Failed to create user');
     }
     
     const result = await response.json();
@@ -114,9 +56,8 @@ export const createUser = async (
       throw new Error(result.error || 'Failed to create user');
     }
 
-    // Send welcome email with login details
-    await sendEmail('account_created', email, firstName, password);
-
+    console.log('User created successfully:', result);
+    
     return { success: true };
   } catch (error: any) {
     console.error('Error creating user:', error);

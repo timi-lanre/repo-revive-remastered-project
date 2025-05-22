@@ -18,6 +18,39 @@ const supabase = createClient(
   }
 );
 
+const sendEmail = async (type: 'account_created', email: string, firstName: string, password?: string) => {
+  try {
+    console.log('Sending email via Edge Function:', { type, email, firstName });
+    const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+      },
+      body: JSON.stringify({ 
+        type, 
+        email, 
+        firstName, 
+        password,
+        loginUrl: 'https://advisorconnect.ca/login'
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Email API response:', errorText);
+      throw new Error('Failed to send email notification');
+    }
+    
+    console.log('Email sent successfully');
+    return true;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    // Don't throw - we don't want email failures to prevent user creation response
+    return false;
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -33,7 +66,7 @@ Deno.serve(async (req) => {
     if (path === "/create-user" && req.method === "POST") {
       const { email, password, firstName, lastName } = await req.json();
 
-      console.log('Creating user:', { email, firstName, lastName });
+      console.log('Creating user in Edge Function:', { email, firstName, lastName });
 
       // Check if user already exists in auth.users
       const { data: existingAuthUsers, error: authListError } = await supabase.auth.admin.listUsers();
@@ -52,7 +85,7 @@ Deno.serve(async (req) => {
       const existingAuthUser = existingAuthUsers.users.find(user => user.email === email);
       if (existingAuthUser) {
         return new Response(
-          JSON.stringify({ success: false, error: "User already exists" }),
+          JSON.stringify({ success: false, error: "A user with this email already exists" }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,
@@ -61,15 +94,26 @@ Deno.serve(async (req) => {
       }
 
       // Check if user exists in profiles table
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('user_id')
         .eq('email', email)
         .maybeSingle();
 
+      if (profileError) {
+        console.error("Error checking profile:", profileError);
+        return new Response(
+          JSON.stringify({ success: false, error: `Database error: ${profileError.message}` }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
+      }
+
       if (existingProfile) {
         return new Response(
-          JSON.stringify({ success: false, error: "User already exists" }),
+          JSON.stringify({ success: false, error: "A user with this email already exists" }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,
@@ -112,7 +156,7 @@ Deno.serve(async (req) => {
       console.log('User created successfully:', user.id);
 
       // Create user profile
-      const { error: profileError } = await supabase
+      const { error: profileError2 } = await supabase
         .from('user_profiles')
         .insert([
           {
@@ -125,13 +169,13 @@ Deno.serve(async (req) => {
           }
         ]);
 
-      if (profileError) {
+      if (profileError2) {
         // Clean up by deleting the auth user if profile creation fails
-        console.error("Profile error creating user:", profileError);
+        console.error("Profile error creating user:", profileError2);
         await supabase.auth.admin.deleteUser(user.id);
         
         return new Response(
-          JSON.stringify({ success: false, error: `Failed to create user profile: ${profileError.message}` }),
+          JSON.stringify({ success: false, error: `Failed to create user profile: ${profileError2.message}` }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 500,
@@ -140,6 +184,10 @@ Deno.serve(async (req) => {
       }
 
       console.log('User profile created successfully');
+      
+      // Send welcome email with login details
+      const emailSent = await sendEmail('account_created', email, firstName, password);
+      console.log('Email sending result:', emailSent);
 
       return new Response(
         JSON.stringify({ 
@@ -147,7 +195,8 @@ Deno.serve(async (req) => {
           user: { 
             id: user.id,
             email: user.email
-          } 
+          },
+          emailSent
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -258,9 +307,9 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error in edge function:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal Server Error" }),
+      JSON.stringify({ success: false, error: error.message || "Internal Server Error" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
