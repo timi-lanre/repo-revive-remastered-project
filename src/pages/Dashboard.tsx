@@ -3,14 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle, X, ChevronDown } from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
@@ -38,11 +33,104 @@ interface FilterOptions {
   teams: string[];
 }
 
+interface MultiSelectProps {
+  value: string[];
+  onChange: (values: string[]) => void;
+  options: string[];
+  placeholder: string;
+  disabled?: boolean;
+}
+
 const ITEMS_PER_PAGE = 50;
+
+// Multi-select dropdown component
+const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, placeholder, disabled = false }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleToggle = (option: string) => {
+    const newValue = value.includes(option)
+      ? value.filter(v => v !== option)
+      : [...value, option];
+    onChange(newValue);
+  };
+
+  const handleRemove = (option: string) => {
+    onChange(value.filter(v => v !== option));
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <div className="relative">
+      <div
+        className={`flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background 
+          ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} 
+          focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+      >
+        <div className="flex flex-wrap gap-1 flex-1">
+          {value.length === 0 ? (
+            <span className="text-muted-foreground">{placeholder}</span>
+          ) : (
+            value.map((item) => (
+              <Badge key={item} variant="secondary" className="text-xs">
+                {item}
+                <X
+                  className="ml-1 h-3 w-3 cursor-pointer hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove(item);
+                  }}
+                />
+              </Badge>
+            ))
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {value.length > 0 && (
+            <X
+              className="h-4 w-4 cursor-pointer hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClear();
+              }}
+            />
+          )}
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {isOpen && !disabled && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover p-1 shadow-md">
+          {options.length === 0 ? (
+            <div className="py-2 px-3 text-sm text-muted-foreground">No options available</div>
+          ) : (
+            options.map((option) => (
+              <div
+                key={option}
+                className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
+                onClick={() => handleToggle(option)}
+              >
+                <Checkbox
+                  checked={value.includes(option)}
+                  onChange={() => handleToggle(option)}
+                />
+                <span className="text-sm">{option}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingAdvisors, setLoadingAdvisors] = useState(false);
   const [userName, setUserName] = useState("");
   const [lastLogin, setLastLogin] = useState<string | null>(null);
   const [latestNews, setLatestNews] = useState("");
@@ -54,14 +142,23 @@ const Dashboard = () => {
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const [selectedProvince, setSelectedProvince] = useState<string>("all");
-  const [selectedCity, setSelectedCity] = useState<string>("all");
-  const [selectedFirm, setSelectedFirm] = useState<string>("all");
-  const [selectedBranch, setSelectedBranch] = useState<string>("all");
-  const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [selectedFavoritesList, setSelectedFavoritesList] = useState<string>("all");
-  const [selectedReportList, setSelectedReportList] = useState<string>("all");
+  // Multi-select filter states
+  const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
 
+  // All available filter options (unfiltered)
+  const [allFilterOptions, setAllFilterOptions] = useState<FilterOptions>({
+    provinces: [],
+    cities: [],
+    firms: [],
+    branches: [],
+    teams: []
+  });
+
+  // Filtered options based on current selections
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     provinces: [],
     cities: [],
@@ -76,22 +173,137 @@ const Dashboard = () => {
     threshold: 0,
   });
 
-  const loadAdvisors = async (pageNumber: number, searchTerm: string = "") => {
+  // Load all filter options on component mount
+  const loadAllFilterOptions = async () => {
     try {
+      const { data, error } = await supabase
+        .from('advisors')
+        .select('province, city, firm, branch, team_name');
+
+      if (error) throw error;
+
+      const options: FilterOptions = {
+        provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
+        cities: Array.from(new Set(data.map(d => d.city).filter(Boolean))).sort(),
+        firms: Array.from(new Set(data.map(d => d.firm).filter(Boolean))).sort(),
+        branches: Array.from(new Set(data.map(d => d.branch).filter(Boolean))).sort(),
+        teams: Array.from(new Set(data.map(d => d.team_name).filter(Boolean))).sort()
+      };
+
+      setAllFilterOptions(options);
+      setFilterOptions(options);
+    } catch (error) {
+      console.error("Error loading all filter options:", error);
+    }
+  };
+
+  // Update cascading filter options based on current selections
+  const updateCascadingFilters = async () => {
+    try {
+      let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
+
+      // Apply current filters to determine what options should be available
+      if (selectedProvinces.length > 0) {
+        query = query.in('province', selectedProvinces);
+      }
+      if (selectedCities.length > 0) {
+        query = query.in('city', selectedCities);
+      }
+      if (selectedFirms.length > 0) {
+        query = query.in('firm', selectedFirms);
+      }
+      if (selectedBranches.length > 0) {
+        query = query.in('branch', selectedBranches);
+      }
+      if (selectedTeams.length > 0) {
+        query = query.in('team_name', selectedTeams);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Determine which filters have selections
+      const hasAnyFilter = selectedProvinces.length > 0 || selectedCities.length > 0 || 
+                          selectedFirms.length > 0 || selectedBranches.length > 0 || selectedTeams.length > 0;
+
+      const newOptions: FilterOptions = {
+        provinces: hasAnyFilter ? 
+          Array.from(new Set([...selectedProvinces, ...data.map(d => d.province).filter(Boolean)])).sort() :
+          allFilterOptions.provinces,
+        
+        cities: hasAnyFilter ?
+          Array.from(new Set([...selectedCities, ...data.map(d => d.city).filter(Boolean)])).sort() :
+          allFilterOptions.cities,
+        
+        firms: hasAnyFilter ?
+          Array.from(new Set([...selectedFirms, ...data.map(d => d.firm).filter(Boolean)])).sort() :
+          allFilterOptions.firms,
+        
+        branches: hasAnyFilter ?
+          Array.from(new Set([...selectedBranches, ...data.map(d => d.branch).filter(Boolean)])).sort() :
+          allFilterOptions.branches,
+        
+        teams: hasAnyFilter ?
+          Array.from(new Set([...selectedTeams, ...data.map(d => d.team_name).filter(Boolean)])).sort() :
+          allFilterOptions.teams
+      };
+
+      setFilterOptions(newOptions);
+
+      // Remove selected values that are no longer available
+      const validProvinces = selectedProvinces.filter(p => newOptions.provinces.includes(p));
+      if (validProvinces.length !== selectedProvinces.length) {
+        setSelectedProvinces(validProvinces);
+      }
+      
+      const validCities = selectedCities.filter(c => newOptions.cities.includes(c));
+      if (validCities.length !== selectedCities.length) {
+        setSelectedCities(validCities);
+      }
+      
+      const validFirms = selectedFirms.filter(f => newOptions.firms.includes(f));
+      if (validFirms.length !== selectedFirms.length) {
+        setSelectedFirms(validFirms);
+      }
+      
+      const validBranches = selectedBranches.filter(b => newOptions.branches.includes(b));
+      if (validBranches.length !== selectedBranches.length) {
+        setSelectedBranches(validBranches);
+      }
+      
+      const validTeams = selectedTeams.filter(t => newOptions.teams.includes(t));
+      if (validTeams.length !== selectedTeams.length) {
+        setSelectedTeams(validTeams);
+      }
+
+    } catch (error) {
+      console.error("Error updating cascading filters:", error);
+    }
+  };
+
+  const loadAdvisors = async (pageNumber: number, searchTerm: string = "", forceReload: boolean = false) => {
+    if (loadingAdvisors && !forceReload) return;
+    
+    try {
+      setLoadingAdvisors(true);
+      
       let query = supabase
         .from('advisors')
         .select('*', { count: 'exact' });
 
-      if (searchTerm) {
-        query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
+      // Apply search filter
+      if (searchTerm.trim()) {
+        query = query.or(`first_name.ilike.%${searchTerm.trim()}%,last_name.ilike.%${searchTerm.trim()}%`);
       }
 
-      if (selectedProvince !== "all") query = query.eq('province', selectedProvince);
-      if (selectedCity !== "all") query = query.eq('city', selectedCity);
-      if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
-      if (selectedBranch !== "all") query = query.eq('branch', selectedBranch);
-      if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
+      // Apply multi-select filters
+      if (selectedProvinces.length > 0) query = query.in('province', selectedProvinces);
+      if (selectedCities.length > 0) query = query.in('city', selectedCities);
+      if (selectedFirms.length > 0) query = query.in('firm', selectedFirms);
+      if (selectedBranches.length > 0) query = query.in('branch', selectedBranches);
+      if (selectedTeams.length > 0) query = query.in('team_name', selectedTeams);
 
+      // Apply sorting
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
         lastName: 'last_name',
@@ -103,12 +315,11 @@ const Dashboard = () => {
         province: 'province'
       };
 
-      const dbColumn = columnMap[sortColumn] || sortColumn;
-      if (sortDirection === 'asc') {
-        query = query.order(dbColumn, { ascending: true, nullsFirst: false });
-      } else {
-        query = query.order(dbColumn, { ascending: false, nullsFirst: true });
-      }
+      const dbColumn = columnMap[sortColumn] || 'first_name';
+      query = query.order(dbColumn, { 
+        ascending: sortDirection === 'asc', 
+        nullsFirst: sortDirection === 'desc' 
+      });
 
       const { data, count, error } = await query
         .range(pageNumber * ITEMS_PER_PAGE, (pageNumber + 1) * ITEMS_PER_PAGE - 1);
@@ -117,11 +328,11 @@ const Dashboard = () => {
 
       const formattedData = data.map(advisor => ({
         id: advisor.id,
-        firstName: advisor.first_name,
-        lastName: advisor.last_name,
+        firstName: advisor.first_name || '',
+        lastName: advisor.last_name || '',
         teamName: advisor.team_name || '',
         title: advisor.title || '',
-        firm: advisor.firm,
+        firm: advisor.firm || '',
         branch: advisor.branch || '',
         city: advisor.city || '',
         province: advisor.province || '',
@@ -140,101 +351,55 @@ const Dashboard = () => {
       setHasMore((count || 0) > (pageNumber + 1) * ITEMS_PER_PAGE);
     } catch (error) {
       console.error("Error loading advisors:", error);
+    } finally {
+      setLoadingAdvisors(false);
     }
   };
 
-  const loadFilterOptions = async () => {
-    try {
-      let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
-
-      if (selectedProvince !== "all") {
-        query = query.eq('province', selectedProvince);
-      }
-      if (selectedCity !== "all") {
-        query = query.eq('city', selectedCity);
-      }
-      if (selectedFirm !== "all") {
-        query = query.eq('firm', selectedFirm);
-      }
-      if (selectedBranch !== "all") {
-        query = query.eq('branch', selectedBranch);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const options: FilterOptions = {
-        provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
-        cities: Array.from(new Set(data.map(d => d.city).filter(Boolean))).sort(),
-        firms: Array.from(new Set(data.map(d => d.firm).filter(Boolean))).sort(),
-        branches: Array.from(new Set(data.map(d => d.branch).filter(Boolean))).sort(),
-        teams: Array.from(new Set(data.map(d => d.team_name).filter(Boolean))).sort()
-      };
-
-      setFilterOptions(options);
-    } catch (error) {
-      console.error("Error loading filter options:", error);
-    }
-  };
-
-  useEffect(() => {
-    loadFilterOptions();
-  }, [selectedProvince, selectedCity, selectedFirm, selectedBranch]);
-
-  const handleFilterChange = async (value: string, filterType: string) => {
-    switch (filterType) {
-      case 'province':
-        setSelectedProvince(value);
-        setSelectedCity('all');
-        setSelectedFirm('all');
-        setSelectedBranch('all');
-        setSelectedTeam('all');
-        break;
-      case 'city':
-        setSelectedCity(value);
-        setSelectedFirm('all');
-        setSelectedBranch('all');
-        setSelectedTeam('all');
-        break;
-      case 'firm':
-        setSelectedFirm(value);
-        setSelectedBranch('all');
-        setSelectedTeam('all');
-        break;
-      case 'branch':
-        setSelectedBranch(value);
-        setSelectedTeam('all');
-        break;
-      case 'team':
-        setSelectedTeam(value);
-        break;
-    }
-  };
-
-  const applyFilters = async () => {
-    setPage(0);
-    if (tableContainerRef.current) {
-      tableContainerRef.current.scrollTop = 0;
-    }
-    await loadAdvisors(0, searchQuery);
-  };
-
+  // Debounced search
   const debouncedSearch = useCallback(
     debounce((term: string) => {
       setPage(0);
-      loadAdvisors(0, term);
+      if (tableContainerRef.current) {
+        tableContainerRef.current.scrollTop = 0;
+      }
+      loadAdvisors(0, term, true);
     }, 300),
-    [selectedProvince, selectedCity, selectedFirm, selectedBranch, selectedTeam]
+    [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]
   );
 
+  // Handle infinite scroll
   useEffect(() => {
-    if (inView && hasMore && !isLoading) {
-      setPage(prev => prev + 1);
-      loadAdvisors(page + 1, searchQuery);
+    if (inView && hasMore && !loadingAdvisors && advisors.length > 0) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadAdvisors(nextPage, searchQuery);
     }
-  }, [inView, hasMore]);
+  }, [inView, hasMore, loadingAdvisors, advisors.length, page, searchQuery]);
 
+  // Update cascading filters when any filter changes
+  useEffect(() => {
+    if (allFilterOptions.provinces.length > 0) {
+      updateCascadingFilters();
+    }
+  }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, allFilterOptions]);
+
+  // Reload advisors when filters change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!loadingAdvisors && allFilterOptions.provinces.length > 0) {
+        setPage(0);
+        if (tableContainerRef.current) {
+          tableContainerRef.current.scrollTop = 0;
+        }
+        loadAdvisors(0, searchQuery, true);
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]);
+
+  // Initial load
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -264,8 +429,8 @@ const Dashboard = () => {
           setLatestNews(newsData.content);
         }
 
-        await loadAdvisors(0);
-        await loadFilterOptions();
+        await loadAllFilterOptions();
+        await loadAdvisors(0, '', true);
       } catch (error) {
         console.error("Error in dashboard:", error);
         navigate("/login");
@@ -293,13 +458,11 @@ const Dashboard = () => {
   };
 
   const resetFilters = async () => {
-    setSelectedProvince("all");
-    setSelectedCity("all");
-    setSelectedFirm("all");
-    setSelectedBranch("all");
-    setSelectedTeam("all");
-    setSelectedFavoritesList("all");
-    setSelectedReportList("all");
+    setSelectedProvinces([]);
+    setSelectedCities([]);
+    setSelectedFirms([]);
+    setSelectedBranches([]);
+    setSelectedTeams([]);
     setSearchQuery("");
     setSortColumn("firstName");
     setSortDirection("asc");
@@ -309,21 +472,40 @@ const Dashboard = () => {
       tableContainerRef.current.scrollTop = 0;
     }
     
-    await loadAdvisors(0, "");
-    await loadFilterOptions();
+    // Reset filter options to show all
+    setFilterOptions(allFilterOptions);
+    
+    // Reload with no filters
+    await loadAdvisors(0, "", true);
   };
 
-  const handleSort = (column: string) => {
-    if (column === 'actions') return;
+  const handleSort = async (column: string) => {
+    if (column === 'actions' || loadingAdvisors) return;
+    
+    let newSortDirection: "asc" | "desc" = "asc";
     
     if (sortColumn === column) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
+      newSortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     }
+    
+    setSortColumn(column);
+    setSortDirection(newSortDirection);
     setPage(0);
-    loadAdvisors(0, searchQuery);
+    
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
+    
+    // Force reload with new sort
+    await loadAdvisors(0, searchQuery, true);
+  };
+
+  const applyFilters = async () => {
+    setPage(0);
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
+    await loadAdvisors(0, searchQuery, true);
   };
 
   if (isLoading) {
@@ -339,6 +521,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
+      {/* Header */}
       <div className="w-full px-4 sm:px-8 md:px-12 py-6 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto">
@@ -388,7 +571,9 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="w-full max-w-[1800px] mx-auto px-4 py-8">
+        {/* Latest News */}
         {latestNews && (
           <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
             <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
@@ -396,6 +581,7 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Filters Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -404,115 +590,85 @@ const Dashboard = () => {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            <Select 
-              value={selectedProvince} 
-              onValueChange={(value) => handleFilterChange(value, 'province')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Provinces" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Provinces</SelectItem>
-                {filterOptions.provinces.map((province) => (
-                  <SelectItem key={province} value={province}>
-                    {province}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Provinces</label>
+              <MultiSelect
+                value={selectedProvinces}
+                onChange={setSelectedProvinces}
+                options={filterOptions.provinces}
+                placeholder="Select provinces..."
+              />
+            </div>
 
-            <Select 
-              value={selectedCity} 
-              onValueChange={(value) => handleFilterChange(value, 'city')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Cities" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cities</SelectItem>
-                {filterOptions.cities.map((city) => (
-                  <SelectItem key={city} value={city}>
-                    {city}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Cities</label>
+              <MultiSelect
+                value={selectedCities}
+                onChange={setSelectedCities}
+                options={filterOptions.cities}
+                placeholder="Select cities..."
+              />
+            </div>
 
-            <Select 
-              value={selectedFirm} 
-              onValueChange={(value) => handleFilterChange(value, 'firm')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Firms" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Firms</SelectItem>
-                {filterOptions.firms.map((firm) => (
-                  <SelectItem key={firm} value={firm}>
-                    {firm}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Firms</label>
+              <MultiSelect
+                value={selectedFirms}
+                onChange={setSelectedFirms}
+                options={filterOptions.firms}
+                placeholder="Select firms..."
+              />
+            </div>
 
-            <Select 
-              value={selectedBranch} 
-              onValueChange={(value) => handleFilterChange(value, 'branch')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Branches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                {filterOptions.branches.map((branch) => (
-                  <SelectItem key={branch} value={branch}>
-                    {branch}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Branches</label>
+              <MultiSelect
+                value={selectedBranches}
+                onChange={setSelectedBranches}
+                options={filterOptions.branches}
+                placeholder="Select branches..."
+              />
+            </div>
 
-            <Select 
-              value={selectedTeam} 
-              onValueChange={(value) => handleFilterChange(value, 'team')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Teams" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
-                {filterOptions.teams.map((team) => (
-                  <SelectItem key={team} value={team}>
-                    {team}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedFavoritesList} onValueChange={setSelectedFavoritesList}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Lists" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Lists</SelectItem>
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Teams</label>
+              <MultiSelect
+                value={selectedTeams}
+                onChange={setSelectedTeams}
+                options={filterOptions.teams}
+                placeholder="Select teams..."
+              />
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={resetFilters}>
-              Reset Filters
-            </Button>
-            <Button 
-              className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
-              onClick={applyFilters}
-            >
-              Apply Filters
-            </Button>
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-500">
+              Active filters: {[
+                ...selectedProvinces.map(p => `Province: ${p}`),
+                ...selectedCities.map(c => `City: ${c}`),
+                ...selectedFirms.map(f => `Firm: ${f}`),
+                ...selectedBranches.map(b => `Branch: ${b}`),
+                ...selectedTeams.map(t => `Team: ${t}`)
+              ].length || 'None'}
+            </div>
+            
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={resetFilters}>
+                Reset Filters
+              </Button>
+              <Button 
+                className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+                onClick={applyFilters}
+                disabled={loadingAdvisors}
+              >
+                {loadingAdvisors ? 'Loading...' : 'Apply Filters'}
+              </Button>
+            </div>
           </div>
         </div>
 
+        {/* Search Bar */}
         <div className="relative flex-1 max-w-md mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -524,6 +680,7 @@ const Dashboard = () => {
           />
         </div>
 
+        {/* Results Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(13 * 65px + 48px)' }}>
             <table className="w-full table-fixed border-collapse min-w-full">
@@ -545,7 +702,7 @@ const Dashboard = () => {
                       onClick={() => column.key !== 'actions' && handleSort(column.key)}
                       className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
                         column.key !== 'actions' ? 'cursor-pointer hover:bg-gray-100' : ''
-                      } ${column.key === 'actions' ? 'text-center' : ''}`}
+                      } ${column.key === 'actions' ? 'text-center' : ''} ${loadingAdvisors ? 'pointer-events-none opacity-50' : ''}`}
                       style={{ width: column.width }}
                     >
                       <div className="flex items-center gap-1">
@@ -650,9 +807,10 @@ const Dashboard = () => {
 
           <div className="py-3 px-6 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
             Total Advisors: {totalAdvisors}
+            {loadingAdvisors && <span className="ml-2">(Loading...)</span>}
           </div>
           
-          {hasMore && (
+          {hasMore && !loadingAdvisors && (
             <div ref={ref} className="py-4 text-center text-gray-500">
               Loading more advisors...
             </div>
