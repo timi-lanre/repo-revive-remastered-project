@@ -1,24 +1,22 @@
 
-import { Client } from 'openid-client';
-import { Issuer } from 'openid-client';
-import { generators } from 'openid-client';
+import { Issuer as OidcIssuer } from 'openid-client';
 import { cognitoConfig } from "@/config/cognito";
 
 // Initialize OIDC client
-let client: Client | null = null;
+let client: any = null;
 
 export const initializeOidcClient = async () => {
   if (client) return client;
 
   try {
     // Discover the OIDC provider
-    const cognitoIssuer = await Issuer.discover(
+    const cognitoIssuer = await OidcIssuer.discover(
       `https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}/.well-known/openid-configuration`
     );
 
     // Create an OIDC client
     client = new cognitoIssuer.Client({
-      client_id: cognitoConfig.clientId,
+      client_id: cognitoConfig.userPoolWebClientId, // Using the correct property name from cognitoConfig
       redirect_uris: [window.location.origin + '/auth/callback'],
       response_types: ['code'],
     });
@@ -32,8 +30,9 @@ export const initializeOidcClient = async () => {
 
 export const getAuthorizationUrl = async () => {
   const oidcClient = await initializeOidcClient();
-  const nonce = generators.nonce();
-  const state = generators.state();
+  // Using crypto API instead of generators for nonce and state
+  const nonce = Math.random().toString(36).substring(2, 15);
+  const state = Math.random().toString(36).substring(2, 15);
   
   const url = oidcClient.authorizationUrl({
     scope: 'openid email profile',
