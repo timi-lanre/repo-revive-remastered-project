@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
@@ -12,6 +16,7 @@ import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle, X
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 interface Advisor {
   id: string;
@@ -45,7 +50,7 @@ interface MultiSelectProps {
   showAll?: boolean;
 }
 
-const ITEMS_PER_PAGE = 50;
+const ITEMS_PER_PAGE = 13;
 
 const MultiSelect: React.FC<MultiSelectProps> = ({ 
   value, 
@@ -182,7 +187,10 @@ const Dashboard = () => {
   });
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const { ref, inView } = useInView({ threshold: 0 });
+  const { ref, inView } = useInView({
+    threshold: 0,
+    rootMargin: "400px"
+  });
 
   // Load all filter options on component mount
   const loadAllFilterOptions = async () => {
@@ -700,7 +708,7 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Results Table - Maximum Space */}
+        {/* Results Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(100vh - 320px)' }}>
             <table className="w-full table-fixed border-collapse min-w-full">
@@ -741,6 +749,7 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
+                  
                   <tr 
                     key={advisor.id} 
                     className="hover:bg-gray-50 cursor-pointer" 
@@ -852,11 +861,7 @@ const Dashboard = () => {
             {loadingAdvisors && <span className="ml-2">(Loading...)</span>}
           </div>
           
-          {hasMore && !loadingAdvisors && (
-            <div ref={ref} className="py-3 text-center text-gray-500 text-sm">
-              Loading more advisors...
-            </div>
-          )}
+          <div ref={ref} className="opacity-0 h-0" />
         </div>
       </div>
     </div>
