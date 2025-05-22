@@ -2,11 +2,11 @@
 import { loginWithEmailPassword, signOut } from './authFunctions';
 import { getCurrentUser, isAuthenticated, isAdmin } from './userFunctions';
 import { 
-  signUp, 
   getPendingUsers, 
   approveUser, 
   rejectUser,
   resetPassword,
+  createUser,
   UserStatus,
   type PendingUser
 } from './adminFunctions';
@@ -17,12 +17,12 @@ export const authService = {
   getCurrentUser,
   isAuthenticated,
   isAdmin,
-  signUp,
   getPendingUsers,
   approveUser,
   rejectUser,
   loginWithEmailPassword,
-  resetPassword
+  resetPassword,
+  createUser
 };
 
 // Re-export types

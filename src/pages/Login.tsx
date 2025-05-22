@@ -1,9 +1,8 @@
+
 import React from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoginForm from "@/components/form/LoginForm";
-import SignupForm from "@/components/form/SignupForm";
 import { motion } from "framer-motion";
 
 const Login = () => {
@@ -37,46 +36,11 @@ const Login = () => {
               Welcome to Advisor Connect
             </CardTitle>
             <CardDescription className="text-center text-gray-500">
-              Sign in to access your dashboard or create a new account
+              Sign in to access your dashboard
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-8 bg-black/5">
-                <TabsTrigger 
-                  value="login"
-                  className="data-[state=active]:bg-[#E5D3BC] data-[state=active]:text-black"
-                >
-                  Login
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="signup"
-                  className="data-[state=active]:bg-[#E5D3BC] data-[state=active]:text-black"
-                >
-                  Sign Up
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="login">
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <LoginForm />
-                </motion.div>
-              </TabsContent>
-              
-              <TabsContent value="signup">
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <SignupForm />
-                </motion.div>
-              </TabsContent>
-            </Tabs>
+            <LoginForm />
           </CardContent>
           <CardFooter className="flex flex-col space-y-4 opacity-80">
             <div className="text-sm text-center text-gray-500">

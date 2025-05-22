@@ -1,3 +1,4 @@
+
 import { SmtpClient } from "npm:smtp-client";
 
 const corsHeaders = {
@@ -23,10 +24,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { type, email, firstName } = await req.json();
+    const { type, email, firstName, password, loginUrl } = await req.json();
 
     let subject = "";
     let body = "";
+    const appUrl = loginUrl || `${Deno.env.get("APP_URL") || window.location.origin}/login`;
 
     if (type === "approval") {
       subject = "Your Advisor Connect Account Has Been Approved";
@@ -35,7 +37,7 @@ Deno.serve(async (req) => {
 
         Great news! Your Advisor Connect account has been approved. You can now log in to your account and start using our platform.
 
-        Click here to login: ${Deno.env.get("APP_URL")}/login
+        Click here to login: ${appUrl}
 
         Best regards,
         The Advisor Connect Team
@@ -48,6 +50,24 @@ Deno.serve(async (req) => {
         Thank you for your interest in Advisor Connect. After reviewing your application, we regret to inform you that we are unable to approve your account at this time.
 
         If you believe this was in error or would like to discuss this further, please contact our support team.
+
+        Best regards,
+        The Advisor Connect Team
+      `;
+    } else if (type === "account_created") {
+      subject = "Welcome to Advisor Connect - Your Account Details";
+      body = `
+        Dear ${firstName},
+
+        Welcome to Advisor Connect! An account has been created for you by an administrator.
+
+        Here are your login details:
+        - Email: ${email}
+        - Temporary Password: ${password}
+
+        Please login at: ${appUrl}
+
+        For security reasons, we recommend changing your password after your first login.
 
         Best regards,
         The Advisor Connect Team

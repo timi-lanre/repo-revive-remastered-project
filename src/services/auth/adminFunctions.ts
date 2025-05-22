@@ -16,7 +16,17 @@ export interface PendingUser {
   status: UserStatus;
 }
 
-const sendEmail = async (type: 'approval' | 'rejection', email: string, firstName: string) => {
+const generateRandomPassword = (length = 12) => {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-+=";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    password += charset[randomIndex];
+  }
+  return password;
+};
+
+const sendEmail = async (type: 'approval' | 'rejection' | 'account_created', email: string, firstName: string, password?: string) => {
   try {
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
       method: 'POST',
@@ -24,7 +34,13 @@ const sendEmail = async (type: 'approval' | 'rejection', email: string, firstNam
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({ type, email, firstName }),
+      body: JSON.stringify({ 
+        type, 
+        email, 
+        firstName, 
+        password,
+        loginUrl: window.location.origin + '/login'
+      }),
     });
 
     if (!response.ok) {
@@ -32,6 +48,70 @@ const sendEmail = async (type: 'approval' | 'rejection', email: string, firstNam
     }
   } catch (error) {
     console.error('Error sending email:', error);
+  }
+};
+
+export const createUser = async (
+  firstName: string, 
+  lastName: string, 
+  email: string
+): Promise<{ success: boolean }> => {
+  try {
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingUser) {
+      throw new Error("A user with this email already exists");
+    }
+
+    // Generate a random password
+    const password = generateRandomPassword();
+
+    // Create the user in Supabase Auth
+    const { data: { user }, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+      }
+    });
+
+    if (authError) throw authError;
+    if (!user) throw new Error("Failed to create user");
+
+    // Create user profile
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .insert([
+        {
+          user_id: user.id,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          status: "APPROVED", // Auto-approve admin-created users
+          role: "user"
+        }
+      ]);
+
+    if (profileError) {
+      // Clean up by deleting the auth user if profile creation fails
+      await supabase.auth.admin.deleteUser(user.id);
+      throw profileError;
+    }
+
+    // Send welcome email with login details
+    await sendEmail('account_created', email, firstName, password);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    throw error;
   }
 };
 

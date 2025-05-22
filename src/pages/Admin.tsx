@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,9 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { authService, PendingUser, UserStatus } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, UserX, RefreshCcw, LogOut, LayoutDashboard, Key } from "lucide-react";
+import { UserCheck, UserX, RefreshCcw, LogOut, LayoutDashboard, Key, UserPlus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
+import CreateUserForm from "@/components/admin/CreateUserForm";
 
 interface UserProfile {
   id: string;
@@ -263,8 +265,12 @@ const Admin = () => {
           </div>
         )}
         
-        <Tabs defaultValue="pending" className="space-y-4">
+        <Tabs defaultValue="create" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="create">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Create User
+            </TabsTrigger>
             <TabsTrigger value="pending">
               Pending Requests
               {pendingUsers.length > 0 && (
@@ -275,6 +281,10 @@ const Admin = () => {
             </TabsTrigger>
             <TabsTrigger value="all">All Users</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="create">
+            <CreateUserForm />
+          </TabsContent>
 
           <TabsContent value="pending">
             <Card>
