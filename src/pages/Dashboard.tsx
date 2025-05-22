@@ -39,71 +39,80 @@ interface MultiSelectProps {
   options: string[];
   placeholder: string;
   disabled?: boolean;
+  showAll?: boolean;
 }
 
 const ITEMS_PER_PAGE = 50;
 
-// Multi-select dropdown component
-const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, placeholder, disabled = false }) => {
+// Multi-select dropdown component with proper UX
+const MultiSelect: React.FC<MultiSelectProps> = ({ 
+  value, 
+  onChange, 
+  options, 
+  placeholder, 
+  disabled = false, 
+  showAll = false 
+}) => {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleToggle = (option: string) => {
-    const newValue = value.includes(option)
-      ? value.filter(v => v !== option)
-      : [...value, option];
-    onChange(newValue);
+    if (option === "All") {
+      onChange([]);
+    } else {
+      const newValue = value.includes(option)
+        ? value.filter(v => v !== option)
+        : [...value, option];
+      onChange(newValue);
+    }
+    // Close dropdown after selection for better UX
+    setIsOpen(false);
   };
 
-  const handleRemove = (option: string) => {
-    onChange(value.filter(v => v !== option));
-  };
-
-  const handleClear = () => {
-    onChange([]);
-  };
+  const displayValue = value.length === 0 ? "All" : value.length === 1 ? value[0] : `${value.length} selected`;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <div
         className={`flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background 
           ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} 
           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
-        <div className="flex flex-wrap gap-1 flex-1">
-          {value.length === 0 ? (
-            <span className="text-muted-foreground">{placeholder}</span>
-          ) : (
-            value.map((item) => (
-              <Badge key={item} variant="secondary" className="text-xs">
-                {item}
-                <X
-                  className="ml-1 h-3 w-3 cursor-pointer hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemove(item);
-                  }}
-                />
-              </Badge>
-            ))
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {value.length > 0 && (
-            <X
-              className="h-4 w-4 cursor-pointer hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClear();
-              }}
-            />
-          )}
-          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </div>
+        <span className={value.length === 0 ? "text-muted-foreground" : "text-foreground"}>
+          {displayValue}
+        </span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {isOpen && !disabled && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover p-1 shadow-md">
+          {showAll && (
+            <div
+              className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
+              onClick={() => handleToggle("All")}
+            >
+              <Checkbox
+                checked={value.length === 0}
+                readOnly
+              />
+              <span className="text-sm font-semibold">All</span>
+            </div>
+          )}
           {options.length === 0 ? (
             <div className="py-2 px-3 text-sm text-muted-foreground">No options available</div>
           ) : (
@@ -115,7 +124,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
               >
                 <Checkbox
                   checked={value.includes(option)}
-                  onChange={() => handleToggle(option)}
+                  readOnly
                 />
                 <span className="text-sm">{option}</span>
               </div>
@@ -142,12 +151,19 @@ const Dashboard = () => {
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Multi-select filter states
+  // Filter states - current UI selections (not applied yet)
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+
+  // Applied filters - what's actually filtering the data
+  const [appliedProvinces, setAppliedProvinces] = useState<string[]>([]);
+  const [appliedCities, setAppliedCities] = useState<string[]>([]);
+  const [appliedFirms, setAppliedFirms] = useState<string[]>([]);
+  const [appliedBranches, setAppliedBranches] = useState<string[]>([]);
+  const [appliedTeams, setAppliedTeams] = useState<string[]>([]);
 
   // All available filter options (unfiltered)
   const [allFilterOptions, setAllFilterOptions] = useState<FilterOptions>({
@@ -158,7 +174,7 @@ const Dashboard = () => {
     teams: []
   });
 
-  // Filtered options based on current selections
+  // Filtered options based on current UI selections (for cascading)
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     provinces: [],
     cities: [],
@@ -168,10 +184,7 @@ const Dashboard = () => {
   });
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
-
-  const { ref, inView } = useInView({
-    threshold: 0,
-  });
+  const { ref, inView } = useInView({ threshold: 0 });
 
   // Load all filter options on component mount
   const loadAllFilterOptions = async () => {
@@ -197,12 +210,12 @@ const Dashboard = () => {
     }
   };
 
-  // Update cascading filter options based on current selections
+  // Update cascading filter options based on current UI selections
   const updateCascadingFilters = async () => {
     try {
       let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
-      // Apply current filters to determine what options should be available
+      // Apply current UI filter selections to determine cascading options
       if (selectedProvinces.length > 0) {
         query = query.in('province', selectedProvinces);
       }
@@ -222,7 +235,6 @@ const Dashboard = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Determine which filters have selections
       const hasAnyFilter = selectedProvinces.length > 0 || selectedCities.length > 0 || 
                           selectedFirms.length > 0 || selectedBranches.length > 0 || selectedTeams.length > 0;
 
@@ -230,19 +242,15 @@ const Dashboard = () => {
         provinces: hasAnyFilter ? 
           Array.from(new Set([...selectedProvinces, ...data.map(d => d.province).filter(Boolean)])).sort() :
           allFilterOptions.provinces,
-        
         cities: hasAnyFilter ?
           Array.from(new Set([...selectedCities, ...data.map(d => d.city).filter(Boolean)])).sort() :
           allFilterOptions.cities,
-        
         firms: hasAnyFilter ?
           Array.from(new Set([...selectedFirms, ...data.map(d => d.firm).filter(Boolean)])).sort() :
           allFilterOptions.firms,
-        
         branches: hasAnyFilter ?
           Array.from(new Set([...selectedBranches, ...data.map(d => d.branch).filter(Boolean)])).sort() :
           allFilterOptions.branches,
-        
         teams: hasAnyFilter ?
           Array.from(new Set([...selectedTeams, ...data.map(d => d.team_name).filter(Boolean)])).sort() :
           allFilterOptions.teams
@@ -296,12 +304,12 @@ const Dashboard = () => {
         query = query.or(`first_name.ilike.%${searchTerm.trim()}%,last_name.ilike.%${searchTerm.trim()}%`);
       }
 
-      // Apply multi-select filters
-      if (selectedProvinces.length > 0) query = query.in('province', selectedProvinces);
-      if (selectedCities.length > 0) query = query.in('city', selectedCities);
-      if (selectedFirms.length > 0) query = query.in('firm', selectedFirms);
-      if (selectedBranches.length > 0) query = query.in('branch', selectedBranches);
-      if (selectedTeams.length > 0) query = query.in('team_name', selectedTeams);
+      // Apply the APPLIED filters (not the UI selections)
+      if (appliedProvinces.length > 0) query = query.in('province', appliedProvinces);
+      if (appliedCities.length > 0) query = query.in('city', appliedCities);
+      if (appliedFirms.length > 0) query = query.in('firm', appliedFirms);
+      if (appliedBranches.length > 0) query = query.in('branch', appliedBranches);
+      if (appliedTeams.length > 0) query = query.in('team_name', appliedTeams);
 
       // Apply sorting
       const columnMap: Record<string, string> = {
@@ -365,7 +373,7 @@ const Dashboard = () => {
       }
       loadAdvisors(0, term, true);
     }, 300),
-    [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]
+    [appliedProvinces, appliedCities, appliedFirms, appliedBranches, appliedTeams, sortColumn, sortDirection]
   );
 
   // Handle infinite scroll
@@ -377,27 +385,23 @@ const Dashboard = () => {
     }
   }, [inView, hasMore, loadingAdvisors, advisors.length, page, searchQuery]);
 
-  // Update cascading filters when any filter changes
+  // Update cascading filters when UI filter selections change
   useEffect(() => {
     if (allFilterOptions.provinces.length > 0) {
       updateCascadingFilters();
     }
   }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, allFilterOptions]);
 
-  // Reload advisors when filters change
+  // Reload advisors when applied filters or sort changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!loadingAdvisors && allFilterOptions.provinces.length > 0) {
-        setPage(0);
-        if (tableContainerRef.current) {
-          tableContainerRef.current.scrollTop = 0;
-        }
-        loadAdvisors(0, searchQuery, true);
+    if (allFilterOptions.provinces.length > 0) {
+      setPage(0);
+      if (tableContainerRef.current) {
+        tableContainerRef.current.scrollTop = 0;
       }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]);
+      loadAdvisors(0, searchQuery, true);
+    }
+  }, [appliedProvinces, appliedCities, appliedFirms, appliedBranches, appliedTeams, sortColumn, sortDirection]);
 
   // Initial load
   useEffect(() => {
@@ -457,12 +461,21 @@ const Dashboard = () => {
     }
   };
 
-  const resetFilters = async () => {
+  const resetFilters = () => {
+    // Reset UI selections
     setSelectedProvinces([]);
     setSelectedCities([]);
     setSelectedFirms([]);
     setSelectedBranches([]);
     setSelectedTeams([]);
+    
+    // Reset applied filters
+    setAppliedProvinces([]);
+    setAppliedCities([]);
+    setAppliedFirms([]);
+    setAppliedBranches([]);
+    setAppliedTeams([]);
+    
     setSearchQuery("");
     setSortColumn("firstName");
     setSortDirection("asc");
@@ -474,12 +487,9 @@ const Dashboard = () => {
     
     // Reset filter options to show all
     setFilterOptions(allFilterOptions);
-    
-    // Reload with no filters
-    await loadAdvisors(0, "", true);
   };
 
-  const handleSort = async (column: string) => {
+  const handleSort = (column: string) => {
     if (column === 'actions' || loadingAdvisors) return;
     
     let newSortDirection: "asc" | "desc" = "asc";
@@ -495,17 +505,30 @@ const Dashboard = () => {
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTop = 0;
     }
-    
-    // Force reload with new sort
-    await loadAdvisors(0, searchQuery, true);
   };
 
-  const applyFilters = async () => {
+  const applyFilters = () => {
+    // Apply the current UI selections to the actual filters
+    setAppliedProvinces(selectedProvinces);
+    setAppliedCities(selectedCities);
+    setAppliedFirms(selectedFirms);
+    setAppliedBranches(selectedBranches);
+    setAppliedTeams(selectedTeams);
+    
     setPage(0);
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTop = 0;
     }
-    await loadAdvisors(0, searchQuery, true);
+  };
+
+  const getActiveFiltersCount = () => {
+    return [
+      ...appliedProvinces,
+      ...appliedCities,
+      ...appliedFirms,
+      ...appliedBranches,
+      ...appliedTeams
+    ].length;
   };
 
   if (isLoading) {
@@ -522,14 +545,14 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       {/* Header */}
-      <div className="w-full px-4 sm:px-8 md:px-12 py-6 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
+      <div className="w-full px-4 sm:px-8 md:px-12 py-4 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto">
             <img
               src="/lovable-uploads/8af3a359-89c1-4bf8-a9ea-f2255c283985.png"
               alt="Advisor Connect"
-              width={268}
-              height={100}
+              width={200}
+              height={75}
               className="object-contain"
             />
           </div>
@@ -560,129 +583,142 @@ const Dashboard = () => {
             </Button>
           </div>
         </div>
-
-        <div className="mt-8">
-          <h1 className="text-2xl font-bold text-[#111827]">
-            Welcome back, {userName}
-          </h1>
-          <p className="text-sm text-gray-700">
-            Last login: {lastLogin || "Loading..."}
-          </p>
-        </div>
       </div>
 
       {/* Main Content */}
-      <div className="w-full max-w-[1800px] mx-auto px-4 py-8">
-        {/* Latest News */}
-        {latestNews && (
-          <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
-            <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
-            <p>Latest News: {latestNews}</p>
-          </div>
-        )}
-
-        {/* Filters Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Search className="h-5 w-5 text-gray-400" />
-              Filters
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="w-full max-w-[1800px] mx-auto px-4 py-4">
+        {/* Welcome Section - Compact */}
+        <div className="mb-4">
+          <div className="flex justify-between items-start">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Provinces</label>
+              <h1 className="text-xl font-bold text-[#111827] mb-1">
+                Welcome back, {userName}
+              </h1>
+              <p className="text-sm text-gray-600">
+                Last login: {lastLogin || "Loading..."}
+              </p>
+            </div>
+            
+            {latestNews && (
+              <div className="flex items-start gap-2 text-gray-600 bg-[#E5D3BC]/10 p-3 rounded-lg border border-[#E5D3BC] max-w-md">
+                <Info className="h-4 w-4 text-[#E5D3BC] mt-0.5 flex-shrink-0" />
+                <p className="text-sm">Latest News: {latestNews}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Compact Filters Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Search className="h-4 w-4 text-gray-400" />
+            <h2 className="text-base font-semibold">Filters</h2>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Province</label>
               <MultiSelect
                 value={selectedProvinces}
                 onChange={setSelectedProvinces}
                 options={filterOptions.provinces}
-                placeholder="Select provinces..."
+                placeholder="Province"
+                showAll={true}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Cities</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
               <MultiSelect
                 value={selectedCities}
                 onChange={setSelectedCities}
                 options={filterOptions.cities}
-                placeholder="Select cities..."
+                placeholder="City"
+                showAll={true}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Firms</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Firm</label>
               <MultiSelect
                 value={selectedFirms}
                 onChange={setSelectedFirms}
                 options={filterOptions.firms}
-                placeholder="Select firms..."
+                placeholder="Firm"
+                showAll={true}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Branches</label>
-              <MultiSelect
-                value={selectedBranches}
-                onChange={setSelectedBranches}
-                options={filterOptions.branches}
-                placeholder="Select branches..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Teams</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Team</label>
               <MultiSelect
                 value={selectedTeams}
                 onChange={setSelectedTeams}
                 options={filterOptions.teams}
-                placeholder="Select teams..."
+                placeholder="Team"
+                showAll={true}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Favorites List</label>
+              <MultiSelect
+                value={[]}
+                onChange={() => {}}
+                options={[]}
+                placeholder="Favorites List"
+                showAll={true}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Report List</label>
+              <MultiSelect
+                value={[]}
+                onChange={() => {}}
+                options={[]}
+                placeholder="Report List"
+                showAll={true}
               />
             </div>
           </div>
 
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Active filters: {[
-                ...selectedProvinces.map(p => `Province: ${p}`),
-                ...selectedCities.map(c => `City: ${c}`),
-                ...selectedFirms.map(f => `Firm: ${f}`),
-                ...selectedBranches.map(b => `Branch: ${b}`),
-                ...selectedTeams.map(t => `Team: ${t}`)
-              ].length || 'None'}
+            <div className="text-xs text-gray-500">
+              Active filters: {getActiveFiltersCount() || 'None'}
             </div>
             
             <div className="flex gap-2">
-              <Button variant="outline" onClick={resetFilters}>
+              <Button variant="outline" size="sm" onClick={resetFilters}>
                 Reset Filters
               </Button>
               <Button 
+                size="sm"
                 className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
                 onClick={applyFilters}
                 disabled={loadingAdvisors}
               >
-                {loadingAdvisors ? 'Loading...' : 'Apply Filters'}
+                Apply Filters
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md mb-6">
+        {/* Search Bar - Compact */}
+        <div className="relative max-w-sm mb-4">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             type="text"
             placeholder="Search by name..."
             value={searchQuery}
             onChange={handleSearch}
-            className="pl-10"
+            className="pl-10 h-9"
           />
         </div>
 
-        {/* Results Table */}
+        {/* Results Table - Maximum Space */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(13 * 65px + 48px)' }}>
+          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(100vh - 320px)' }}>
             <table className="w-full table-fixed border-collapse min-w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -721,37 +757,37 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
-                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ minHeight: '65px' }}>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ minHeight: '50px' }}>
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.firstName}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.lastName}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.teamName}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.title}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.firm}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.branch}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.city}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.province}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-500 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="px-3 py-3 text-sm text-gray-500 text-center">
+                      <div className="flex items-center justify-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:text-[#E5D3BC]"
+                          className="hover:text-[#E5D3BC] h-8 w-8 p-0"
                           title="Add to Favorites"
                         >
                           <Heart className="h-4 w-4" />
@@ -760,7 +796,7 @@ const Dashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:text-[#E5D3BC]"
+                            className="hover:text-[#E5D3BC] h-8 w-8 p-0"
                             title="Send Email"
                             onClick={() => window.location.href = `mailto:${advisor.email}`}
                           >
@@ -771,7 +807,7 @@ const Dashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:text-[#E5D3BC]"
+                            className="hover:text-[#E5D3BC] h-8 w-8 p-0"
                             title="Visit Website"
                             onClick={() => window.open(advisor.websiteUrl, '_blank')}
                           >
@@ -782,7 +818,7 @@ const Dashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:text-[#E5D3BC]"
+                            className="hover:text-[#E5D3BC] h-8 w-8 p-0"
                             title="View LinkedIn Profile"
                             onClick={() => window.open(advisor.linkedinUrl, '_blank')}
                           >
@@ -792,7 +828,7 @@ const Dashboard = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:text-red-500"
+                          className="hover:text-red-500 h-8 w-8 p-0"
                           title="Report Issue"
                         >
                           <AlertTriangle className="h-4 w-4" />
@@ -805,13 +841,13 @@ const Dashboard = () => {
             </table>
           </div>
 
-          <div className="py-3 px-6 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
+          <div className="py-2 px-4 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
             Total Advisors: {totalAdvisors}
             {loadingAdvisors && <span className="ml-2">(Loading...)</span>}
           </div>
           
           {hasMore && !loadingAdvisors && (
-            <div ref={ref} className="py-4 text-center text-gray-500">
+            <div ref={ref} className="py-3 text-center text-gray-500 text-sm">
               Loading more advisors...
             </div>
           )}
