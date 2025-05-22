@@ -10,8 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card } from "@/components/ui/card";
-import { Bell, Info, Search, ChevronUp } from "lucide-react";
+import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle } from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
@@ -26,6 +25,9 @@ interface Advisor {
   branch: string;
   city: string;
   province: string;
+  email: string;
+  websiteUrl: string;
+  linkedinUrl: string;
 }
 
 const ITEMS_PER_PAGE = 50;
@@ -48,8 +50,9 @@ const Dashboard = () => {
   const [selectedProvince, setSelectedProvince] = useState<string>("all");
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [selectedFirm, setSelectedFirm] = useState<string>("all");
-  const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [selectedFavoritesList, setSelectedFavoritesList] = useState<string>("all");
+  const [selectedReportList, setSelectedReportList] = useState<string>("all");
 
   // Infinite scroll
   const { ref, inView } = useInView({
@@ -71,13 +74,13 @@ const Dashboard = () => {
       if (selectedProvince !== "all") query = query.eq('province', selectedProvince);
       if (selectedCity !== "all") query = query.eq('city', selectedCity);
       if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
-      if (selectedBranch !== "all") query = query.eq('branch', selectedBranch);
       if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
 
       // Map frontend column names to database column names for sorting
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
         lastName: 'last_name',
+        teamName: 'team_name',
       };
 
       // Add sorting using the correct column names
@@ -99,7 +102,10 @@ const Dashboard = () => {
         firm: advisor.firm,
         branch: advisor.branch || '',
         city: advisor.city || '',
-        province: advisor.province || ''
+        province: advisor.province || '',
+        email: advisor.email || '',
+        websiteUrl: advisor.website_url || '',
+        linkedinUrl: advisor.linkedin_url || ''
       }));
 
       if (pageNumber === 0) {
@@ -121,7 +127,7 @@ const Dashboard = () => {
       setPage(0);
       loadAdvisors(0, term);
     }, 300),
-    [selectedProvince, selectedCity, selectedFirm, selectedBranch, selectedTeam]
+    [selectedProvince, selectedCity, selectedFirm, selectedTeam]
   );
 
   useEffect(() => {
@@ -193,8 +199,9 @@ const Dashboard = () => {
     setSelectedProvince("all");
     setSelectedCity("all");
     setSelectedFirm("all");
-    setSelectedBranch("all");
     setSelectedTeam("all");
+    setSelectedFavoritesList("all");
+    setSelectedReportList("all");
     setPage(0);
     loadAdvisors(0, searchQuery);
   };
@@ -222,9 +229,9 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+      <header className="bg-white border-b border-gray-200">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
@@ -256,34 +263,31 @@ const Dashboard = () => {
         </div>
 
         {/* Latest News */}
-        <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
-          <Bell className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
-          <p>
-            Latest News: {latestNews || "No updates available"}
-          </p>
-        </div>
+        {latestNews && (
+          <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
+            <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
+            <p>Latest News: {latestNews}</p>
+          </div>
+        )}
 
-        {/* Search and Filters */}
-        <div className="mb-6">
+        {/* Filters Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search by name..."
-                value={searchQuery}
-                onChange={handleSearch}
-                className="pl-10"
-              />
-            </div>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Search className="h-5 w-5 text-gray-400" />
+              Filters
+            </h2>
             <div className="flex gap-2">
               <Button variant="outline" onClick={resetFilters}>
                 Reset Filters
               </Button>
+              <Button className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
+                Apply Filters
+              </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <Select value={selectedProvince} onValueChange={setSelectedProvince}>
               <SelectTrigger>
                 <SelectValue placeholder="Province" />
@@ -309,7 +313,6 @@ const Dashboard = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Cities</SelectItem>
-                {/* Add city options dynamically based on province */}
               </SelectContent>
             </Select>
 
@@ -319,17 +322,6 @@ const Dashboard = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Firms</SelectItem>
-                {/* Add firm options */}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-              <SelectTrigger>
-                <SelectValue placeholder="Branch" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                {/* Add branch options */}
               </SelectContent>
             </Select>
 
@@ -339,17 +331,46 @@ const Dashboard = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Teams</SelectItem>
-                {/* Add team options */}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedFavoritesList} onValueChange={setSelectedFavoritesList}>
+              <SelectTrigger>
+                <SelectValue placeholder="Favorites List" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Lists</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedReportList} onValueChange={setSelectedReportList}>
+              <SelectTrigger>
+                <SelectValue placeholder="Report List" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Reports</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="relative flex-1 max-w-md mb-6">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search by name..."
+            value={searchQuery}
+            onChange={handleSearch}
+            className="pl-10"
+          />
+        </div>
+
         {/* Advisors Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="bg-gray-50">
                 <tr>
                   <th 
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -373,8 +394,16 @@ const Dashboard = () => {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Team Name
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('teamName')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Team Name
+                      {sortColumn === 'teamName' && (
+                        <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                      )}
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Title
@@ -390,6 +419,9 @@ const Dashboard = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Province
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -419,6 +451,59 @@ const Dashboard = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {advisor.province}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:text-[#E5D3BC]"
+                          title="Add to Favorites"
+                        >
+                          <Heart className="h-4 w-4" />
+                        </Button>
+                        {advisor.email && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:text-[#E5D3BC]"
+                            title="Send Email"
+                            onClick={() => window.location.href = `mailto:${advisor.email}`}
+                          >
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {advisor.websiteUrl && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:text-[#E5D3BC]"
+                            title="Visit Website"
+                            onClick={() => window.open(advisor.websiteUrl, '_blank')}
+                          >
+                            <Globe className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {advisor.linkedinUrl && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:text-[#E5D3BC]"
+                            title="View LinkedIn Profile"
+                            onClick={() => window.open(advisor.linkedinUrl, '_blank')}
+                          >
+                            <Linkedin className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:text-red-500"
+                          title="Report Issue"
+                        >
+                          <AlertTriangle className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
