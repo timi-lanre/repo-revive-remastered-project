@@ -210,8 +210,13 @@ const Dashboard = () => {
         setSelectedTeam(value);
         break;
     }
+  };
 
+  const applyFilters = async () => {
     setPage(0);
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
     await loadAdvisors(0, searchQuery);
   };
 
@@ -295,12 +300,9 @@ const Dashboard = () => {
     setSelectedTeam("all");
     setSelectedFavoritesList("all");
     setSelectedReportList("all");
-    
     setSearchQuery("");
-    
     setSortColumn("firstName");
     setSortDirection("asc");
-    
     setPage(0);
     
     if (tableContainerRef.current) {
@@ -308,7 +310,6 @@ const Dashboard = () => {
     }
     
     await loadAdvisors(0, "");
-    
     await loadFilterOptions();
   };
 
@@ -503,7 +504,10 @@ const Dashboard = () => {
             <Button variant="outline" onClick={resetFilters}>
               Reset Filters
             </Button>
-            <Button className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
+            <Button 
+              className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+              onClick={applyFilters}
+            >
               Apply Filters
             </Button>
           </div>
@@ -521,7 +525,7 @@ const Dashboard = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div style={{ height: 'calc(13 * 53px + 48px)' }} className="overflow-auto">
+          <div ref={tableContainerRef} style={{ height: 'calc(13 * 53px + 48px)' }} className="overflow-auto">
             <table className="w-full border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
