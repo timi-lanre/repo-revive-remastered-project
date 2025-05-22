@@ -34,6 +34,7 @@ interface FilterOptions {
   provinces: string[];
   cities: string[];
   firms: string[];
+  branches: string[];
   teams: string[];
 }
 
@@ -57,19 +58,19 @@ const Dashboard = () => {
   const [selectedProvince, setSelectedProvince] = useState<string>("all");
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [selectedFirm, setSelectedFirm] = useState<string>("all");
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [selectedFavoritesList, setSelectedFavoritesList] = useState<string>("all");
   const [selectedReportList, setSelectedReportList] = useState<string>("all");
 
-  // Filter options
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     provinces: [],
     cities: [],
     firms: [],
+    branches: [],
     teams: []
   });
 
-  // Infinite scroll
   const { ref, inView } = useInView({
     threshold: 0,
   });
@@ -80,18 +81,16 @@ const Dashboard = () => {
         .from('advisors')
         .select('*', { count: 'exact' });
 
-      // Apply search if provided
       if (searchTerm) {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
 
-      // Apply filters
       if (selectedProvince !== "all") query = query.eq('province', selectedProvince);
       if (selectedCity !== "all") query = query.eq('city', selectedCity);
       if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
+      if (selectedBranch !== "all") query = query.eq('branch', selectedBranch);
       if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
 
-      // Add sorting with nulls handling
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
         lastName: 'last_name',
@@ -110,7 +109,6 @@ const Dashboard = () => {
         query = query.order(dbColumn, { ascending: false, nullsFirst: true });
       }
 
-      // Add pagination
       const { data, count, error } = await query
         .range(pageNumber * ITEMS_PER_PAGE, (pageNumber + 1) * ITEMS_PER_PAGE - 1);
 
@@ -144,12 +142,10 @@ const Dashboard = () => {
     }
   };
 
-  // Load filter options based on current selection
   const loadFilterOptions = async () => {
     try {
-      let query = supabase.from('advisors').select('province, city, firm, team_name');
+      let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
-      // Apply cascading filters
       if (selectedProvince !== "all") {
         query = query.eq('province', selectedProvince);
       }
@@ -158,6 +154,9 @@ const Dashboard = () => {
       }
       if (selectedFirm !== "all") {
         query = query.eq('firm', selectedFirm);
+      }
+      if (selectedBranch !== "all") {
+        query = query.eq('branch', selectedBranch);
       }
 
       const { data, error } = await query;
@@ -168,6 +167,7 @@ const Dashboard = () => {
         provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
         cities: Array.from(new Set(data.map(d => d.city).filter(Boolean))).sort(),
         firms: Array.from(new Set(data.map(d => d.firm).filter(Boolean))).sort(),
+        branches: Array.from(new Set(data.map(d => d.branch).filter(Boolean))).sort(),
         teams: Array.from(new Set(data.map(d => d.team_name).filter(Boolean))).sort()
       };
 
@@ -177,27 +177,32 @@ const Dashboard = () => {
     }
   };
 
-  // Update filter options when selections change
   useEffect(() => {
     loadFilterOptions();
-  }, [selectedProvince, selectedCity, selectedFirm]);
+  }, [selectedProvince, selectedCity, selectedFirm, selectedBranch]);
 
   const handleFilterChange = async (value: string, filterType: string) => {
-    // Reset dependent filters
     switch (filterType) {
       case 'province':
         setSelectedProvince(value);
         setSelectedCity('all');
         setSelectedFirm('all');
+        setSelectedBranch('all');
         setSelectedTeam('all');
         break;
       case 'city':
         setSelectedCity(value);
         setSelectedFirm('all');
+        setSelectedBranch('all');
         setSelectedTeam('all');
         break;
       case 'firm':
         setSelectedFirm(value);
+        setSelectedBranch('all');
+        setSelectedTeam('all');
+        break;
+      case 'branch':
+        setSelectedBranch(value);
         setSelectedTeam('all');
         break;
       case 'team':
@@ -205,18 +210,16 @@ const Dashboard = () => {
         break;
     }
 
-    // Reset pagination and reload data
     setPage(0);
     await loadAdvisors(0, searchQuery);
   };
 
-  // Debounced search function
   const debouncedSearch = useCallback(
     debounce((term: string) => {
       setPage(0);
       loadAdvisors(0, term);
     }, 300),
-    [selectedProvince, selectedCity, selectedFirm, selectedTeam]
+    [selectedProvince, selectedCity, selectedFirm, selectedBranch, selectedTeam]
   );
 
   useEffect(() => {
@@ -244,7 +247,6 @@ const Dashboard = () => {
           }
         }
 
-        // Get latest news
         const { data: newsData } = await supabase
           .from('news_updates')
           .select('content')
@@ -256,7 +258,6 @@ const Dashboard = () => {
           setLatestNews(newsData.content);
         }
 
-        // Load initial advisors
         await loadAdvisors(0);
         await loadFilterOptions();
       } catch (error) {
@@ -289,6 +290,7 @@ const Dashboard = () => {
     setSelectedProvince("all");
     setSelectedCity("all");
     setSelectedFirm("all");
+    setSelectedBranch("all");
     setSelectedTeam("all");
     setSelectedFavoritesList("all");
     setSelectedReportList("all");
@@ -322,7 +324,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      {/* Header */}
       <div className="w-full px-4 sm:px-8 md:px-12 py-6 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto">
@@ -362,7 +363,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Welcome Section */}
         <div className="mt-8">
           <h1 className="text-2xl font-bold text-[#111827]">
             Welcome back, {userName}
@@ -373,9 +373,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-[95%] mx-auto px-4 py-8">
-        {/* Latest News */}
         {latestNews && (
           <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
             <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
@@ -383,7 +381,6 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Filters Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -445,6 +442,23 @@ const Dashboard = () => {
             </Select>
 
             <Select 
+              value={selectedBranch} 
+              onValueChange={(value) => handleFilterChange(value, 'branch')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {filterOptions.branches.map((branch) => (
+                  <SelectItem key={branch} value={branch}>
+                    {branch}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select 
               value={selectedTeam} 
               onValueChange={(value) => handleFilterChange(value, 'team')}
             >
@@ -469,15 +483,6 @@ const Dashboard = () => {
                 <SelectItem value="all">All Lists</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={selectedReportList} onValueChange={setSelectedReportList}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Reports" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Reports</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -490,7 +495,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
         <div className="relative flex-1 max-w-md mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -502,9 +506,8 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Advisors Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="relative max-h-[600px] overflow-auto">
+          <div className="max-h-[600px] overflow-auto">
             <table className="w-full border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -627,12 +630,10 @@ const Dashboard = () => {
             </table>
           </div>
 
-          {/* Total count */}
           <div className="py-3 px-6 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
             Total Advisors: {totalAdvisors}
           </div>
           
-          {/* Infinite scroll trigger */}
           {hasMore && (
             <div ref={ref} className="py-4 text-center text-gray-500">
               Loading more advisors...
