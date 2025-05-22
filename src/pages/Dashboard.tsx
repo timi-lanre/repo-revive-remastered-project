@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,6 @@ const Dashboard = () => {
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Filters
   const [selectedProvince, setSelectedProvince] = useState<string>("all");
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [selectedFirm, setSelectedFirm] = useState<string>("all");
@@ -70,6 +69,8 @@ const Dashboard = () => {
     branches: [],
     teams: []
   });
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const { ref, inView } = useInView({
     threshold: 0,
@@ -286,7 +287,7 @@ const Dashboard = () => {
     }
   };
 
-  const resetFilters = () => {
+  const resetFilters = async () => {
     setSelectedProvince("all");
     setSelectedCity("all");
     setSelectedFirm("all");
@@ -294,8 +295,21 @@ const Dashboard = () => {
     setSelectedTeam("all");
     setSelectedFavoritesList("all");
     setSelectedReportList("all");
+    
+    setSearchQuery("");
+    
+    setSortColumn("firstName");
+    setSortDirection("asc");
+    
     setPage(0);
-    loadAdvisors(0, searchQuery);
+    
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
+    
+    await loadAdvisors(0, "");
+    
+    await loadFilterOptions();
   };
 
   const handleSort = (column: string) => {
@@ -507,7 +521,10 @@ const Dashboard = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="max-h-[600px] overflow-auto">
+          <div 
+            ref={tableContainerRef}
+            className="relative max-h-[600px] overflow-auto"
+          >
             <table className="w-full border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
