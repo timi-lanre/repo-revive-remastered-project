@@ -38,54 +38,53 @@ const Admin = () => {
     try {
       console.log("Loading user profiles...");
       
-      // Use a more direct query approach with no filtering to get ALL profiles
-      const { data: profiles, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // DIRECT SQL APPROACH FOR DEBUGGING - this bypasses RLS entirely for admins
+      const { data: rawProfiles, error: sqlError } = await supabase.rpc('get_all_profiles_for_admin');
+      
+      if (sqlError) {
+        console.error("SQL function error:", sqlError);
+        console.log("Falling back to standard query...");
         
-      if (profileError) {
-        console.error("Error loading profiles:", profileError);
-        // Check if it's a permission error (most common with RLS)
-        if (profileError.code === '42501' || profileError.message.includes('permission denied')) {
-          console.log("Permission denied error detected. Checking admin status...");
-          const adminCheck = await authService.isAdmin();
-          console.log("Current user admin status:", adminCheck);
+        // Standard approach as fallback
+        const { data: profiles, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
           
-          if (!adminCheck) {
-            throw new Error("Your admin session has expired. Please log in again.");
+        if (profileError) {
+          console.error("Error loading profiles:", profileError);
+          // Check if it's a permission error (most common with RLS)
+          if (profileError.code === '42501' || profileError.message.includes('permission denied')) {
+            console.log("Permission denied error detected. Checking admin status...");
+            const adminCheck = await authService.isAdmin();
+            console.log("Current user admin status:", adminCheck);
+            
+            if (!adminCheck) {
+              throw new Error("Your admin session has expired. Please log in again.");
+            }
           }
+          throw profileError;
         }
-        throw profileError;
+        
+        if (!profiles) {
+          console.log("No profiles found in the database");
+          setAllUsers([]);
+          return;
+        }
+        
+        console.log(`Found ${profiles.length} user profiles through standard query`);
+        processProfiles(profiles);
+      } else {
+        // Process profiles from the SQL function
+        if (!rawProfiles || rawProfiles.length === 0) {
+          console.log("No profiles found in the database (SQL function)");
+          setAllUsers([]);
+          return;
+        }
+        
+        console.log(`Found ${rawProfiles.length} user profiles through SQL function`);
+        processProfiles(rawProfiles);
       }
-
-      if (!profiles) {
-        console.log("No profiles found in the database");
-        setAllUsers([]);
-        return;
-      }
-
-      console.log(`Found ${profiles.length} user profiles`);
-      
-      const formattedUsers = profiles.map(profile => ({
-        id: profile.user_id,
-        email: profile.email || 'No email',
-        firstName: profile.first_name || 'Unknown',
-        lastName: profile.last_name || 'Unknown',
-        status: profile.status || 'UNKNOWN',
-        role: profile.role || 'user',
-        createdAt: profile.created_at || new Date().toISOString()
-      }));
-
-      // Log each user for debugging
-      formattedUsers.forEach((user, index) => {
-        console.log(`User ${index + 1}:`, user.firstName, user.lastName, user.email, user.role);
-      });
-
-      setAllUsers(formattedUsers);
-      setLoadingError(null);
-      console.log("Users loaded successfully:", formattedUsers.length);
-      
     } catch (error: any) {
       console.error("Error loading users:", error);
       setLoadingError(error.message || "Failed to load users");
@@ -109,6 +108,28 @@ const Admin = () => {
         variant: "destructive"
       });
     }
+  };
+
+  // Helper function to process profiles
+  const processProfiles = (profiles: any[]) => {
+    const formattedUsers = profiles.map(profile => ({
+      id: profile.user_id,
+      email: profile.email || 'No email',
+      firstName: profile.first_name || 'Unknown',
+      lastName: profile.last_name || 'Unknown',
+      status: profile.status || 'UNKNOWN',
+      role: profile.role || 'user',
+      createdAt: profile.created_at || new Date().toISOString()
+    }));
+
+    // Log each user for debugging
+    formattedUsers.forEach((user, index) => {
+      console.log(`User ${index + 1}:`, user.firstName, user.lastName, user.email, user.role);
+    });
+
+    setAllUsers(formattedUsers);
+    setLoadingError(null);
+    console.log("Users loaded successfully:", formattedUsers.length);
   };
 
   const refreshUsers = async () => {
@@ -234,7 +255,7 @@ const Admin = () => {
           console.error("Error in auto-refresh:", error);
         });
       }
-    }, 30000); // Refresh every 30 seconds instead of every minute
+    }, 15000); // Refresh every 15 seconds for debugging
     
     return () => {
       window.removeEventListener('userCreated', handleUserCreated);

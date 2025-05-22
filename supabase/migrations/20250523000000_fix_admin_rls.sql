@@ -23,10 +23,11 @@ DROP POLICY IF EXISTS "Users update own profile" ON user_profiles;
 DROP POLICY IF EXISTS "admin_access" ON user_profiles;
 DROP POLICY IF EXISTS "user_read_own" ON user_profiles;
 DROP POLICY IF EXISTS "user_update_own" ON user_profiles;
+DROP POLICY IF EXISTS "admin_full_access" ON user_profiles;
 
--- Create a new simple admin policy that grants full access to admins
--- This avoids the recursive check by using a direct constant check
-CREATE POLICY "admin_full_access"
+-- Create a VERY simple admin policy with no recursive checks
+-- Just use direct column comparison for admin role
+CREATE POLICY "admin_all_access"
 ON user_profiles
 FOR ALL
 TO authenticated
@@ -42,6 +43,13 @@ TO authenticated
 USING (
   auth.uid() = user_id
 );
+
+-- Create an insert policy so new users can be created
+CREATE POLICY "insert_user_profiles"
+ON user_profiles
+FOR INSERT
+TO authenticated
+WITH CHECK (true);
 
 -- Enable RLS to make sure policies are applied
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
