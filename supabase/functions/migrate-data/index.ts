@@ -15,15 +15,14 @@ const supabase = createClient(
 
 // MySQL configuration
 const mysqlConfig = {
-  host: 'advisorwebapp.crcke66wq2ed.ca-central-1.rds.amazonaws.com',
-  port: 3306,
-  user: 'Admin',
-  password: '28UKOJi3OshzZT',
-  database: 'advisor_dashboard'
+  host: Deno.env.get("MYSQL_HOST"),
+  port: parseInt(Deno.env.get("MYSQL_PORT") || "3306"),
+  user: Deno.env.get("MYSQL_USER"),
+  password: Deno.env.get("MYSQL_PASSWORD"),
+  database: Deno.env.get("MYSQL_DATABASE")
 };
 
 Deno.serve(async (req) => {
-  // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -66,6 +65,9 @@ Deno.serve(async (req) => {
         .insert(batch);
       
       if (error) throw error;
+
+      // Log progress
+      console.log(`Migrated batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(advisors.length / batchSize)}`);
     }
 
     return new Response(
