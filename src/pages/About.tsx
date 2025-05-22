@@ -6,6 +6,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { ChevronRight } from "lucide-react";
 
+// Import tab components
+import Overview from "@/components/about/Overview";
+import KeyBenefits from "@/components/about/KeyBenefits";
+import ContactSources from "@/components/about/ContactSources";
+import IncludedFirms from "@/components/about/IncludedFirms";
+
 const About = () => {
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -73,12 +79,6 @@ const About = () => {
             <BreadcrumbItem>
               <BreadcrumbLink as={Link} to="/about">About</BreadcrumbLink>
             </BreadcrumbItem>
-            <BreadcrumbItem>
-              <ChevronRight className="h-4 w-4" />
-            </BreadcrumbItem>
-            <BreadcrumbItem>
-              <span className="text-muted-foreground">Overview</span>
-            </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
       </div>
@@ -115,38 +115,19 @@ const About = () => {
             </TabsList>
 
             <TabsContent value="overview" className="mt-6">
-              <div className="space-y-6">
-                <p className="text-gray-700 leading-relaxed">
-                  Advisor Connect is a revolutionary, all-in-one platform that transforms how professionals identify and connect with Wealth Advisors across Canada's Private Wealth Management industry. This unique database delivers unparalleled access to over 14,000 meticulously curated contacts from 27 leading firms—both bank-owned and independent firms.
-                </p>
-                <p className="text-gray-700 leading-relaxed">
-                  Built by a seasoned industry veteran, Advisor Connect was designed with a deep understanding of the power of a robust CRM. More than just a contact list, it provides accurate, streamlined access to key decision-makers—all within a single, powerful platform. The result? Enhanced opportunity identification, stronger business relationships, and seamless client servicing.
-                </p>
-                <p className="text-gray-700 leading-relaxed">
-                  Covering over 95% of the Canadian Private Wealth market, Advisor Connect is the most comprehensive and accurate database resource available in Canada. Whether you're building strategic partnerships, expanding your client base, optimizing social media campaigns, or conducting in-depth market research, Advisor Connect delivers the data, time savings, and competitive edge you need to succeed.
-                </p>
-              </div>
+              <Overview />
             </TabsContent>
 
-            <TabsContent value="benefits">
-              <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-gray-900">Coming Soon</h3>
-                <p className="text-gray-700">Key benefits information will be available shortly.</p>
-              </div>
+            <TabsContent value="benefits" className="mt-6">
+              <KeyBenefits />
             </TabsContent>
 
-            <TabsContent value="sources">
-              <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-gray-900">Coming Soon</h3>
-                <p className="text-gray-700">Contact sources information will be available shortly.</p>
-              </div>
+            <TabsContent value="sources" className="mt-6">
+              <ContactSources />
             </TabsContent>
 
-            <TabsContent value="firms">
-              <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-gray-900">Coming Soon</h3>
-                <p className="text-gray-700">Firms included information will be available shortly.</p>
-              </div>
+            <TabsContent value="firms" className="mt-6">
+              <IncludedFirms />
             </TabsContent>
           </Tabs>
         </Card>
