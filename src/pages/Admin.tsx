@@ -1,4 +1,3 @@
-// src/pages/Admin.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ const Admin = () => {
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("create");
 
-  // Function to handle tab change and automatically refresh user list when switching to "all" tab
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     if (value === "all") {
@@ -41,27 +39,7 @@ const Admin = () => {
 
   const loadUsers = async () => {
     try {
-      // Load all users from auth - this requires service role key
-      let authUsers: any[] = [];
-      
-      try {
-        // This call is expected to fail with standard client permissions
-        // Only succeeds with service role key on the server
-        const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-        
-        if (authError) {
-          console.log("Note: Auth admin API not accessible with current permissions - this is normal");
-          authUsers = [];
-        } else {
-          authUsers = authData.users || [];
-        }
-      } catch (error) {
-        console.log("Note: Auth admin API not accessible - using profiles only");
-        // This is expected - continue with just profiles
-        authUsers = [];
-      }
-      
-      // Load all profile data - this should work with proper RLS policies
+      // Get all user profiles
       const { data: profiles, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -71,29 +49,22 @@ const Admin = () => {
         console.error("Error loading profiles:", profileError);
         throw profileError;
       }
-      
-      console.log("Loaded profiles:", profiles);
-      
-      // Create combined user list from profiles
-      const usersWithProfile: UserProfile[] = [];
-      
-      // Add all users from profiles table
-      if (profiles && profiles.length > 0) {
-        profiles.forEach(profile => {
-          usersWithProfile.push({
-            id: profile.user_id,
-            email: profile.email || 'No email',
-            firstName: profile.first_name || 'Unknown',
-            lastName: profile.last_name || 'Unknown',
-            status: profile.status || 'UNKNOWN',
-            role: profile.role || 'user',
-            createdAt: profile.created_at || new Date().toISOString()
-          });
-        });
+
+      if (!profiles) {
+        throw new Error("No profiles found");
       }
-      
-      console.log("Combined users:", usersWithProfile);
-      setAllUsers(usersWithProfile);
+
+      const formattedUsers = profiles.map(profile => ({
+        id: profile.user_id,
+        email: profile.email || 'No email',
+        firstName: profile.first_name || 'Unknown',
+        lastName: profile.last_name || 'Unknown',
+        status: profile.status || 'UNKNOWN',
+        role: profile.role || 'user',
+        createdAt: profile.created_at || new Date().toISOString()
+      }));
+
+      setAllUsers(formattedUsers);
       setLoadingError(null);
       
     } catch (error: any) {
@@ -171,7 +142,6 @@ const Admin = () => {
         description: "Profile created for user.",
       });
 
-      // Refresh the user list
       await loadUsers();
     } catch (error) {
       console.error("Error creating profile:", error);
@@ -223,7 +193,6 @@ const Admin = () => {
     
     checkAuth();
     
-    // Listen for user created events
     const handleUserCreated = () => {
       console.log("User created event detected, refreshing list");
       refreshUsers();
