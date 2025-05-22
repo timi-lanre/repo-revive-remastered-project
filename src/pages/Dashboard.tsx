@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -11,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle, X } from "lucide-react";
+import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle } from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
@@ -58,14 +57,12 @@ const Dashboard = () => {
   const [page, setPage] = useState(0);
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [isLoadingFilters, setIsLoadingFilters] = useState(false);
 
-  // Update state to handle single selections
-  const [selectedProvince, setSelectedProvince] = useState<string>("");
-  const [selectedCity, setSelectedCity] = useState<string>("");
-  const [selectedFirm, setSelectedFirm] = useState<string>("");
-  const [selectedBranch, setSelectedBranch] = useState<string>("");
-  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [selectedProvince, setSelectedProvince] = useState<string>("all");
+  const [selectedCity, setSelectedCity] = useState<string>("all");
+  const [selectedFirm, setSelectedFirm] = useState<string>("all");
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [selectedFavoritesList, setSelectedFavoritesList] = useState<string>("all");
   const [selectedReportList, setSelectedReportList] = useState<string>("all");
 
@@ -93,22 +90,11 @@ const Dashboard = () => {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
 
-      // Apply single filters
-      if (selectedProvince) {
-        query = query.eq('province', selectedProvince);
-      }
-      if (selectedCity) {
-        query = query.eq('city', selectedCity);
-      }
-      if (selectedFirm) {
-        query = query.eq('firm', selectedFirm);
-      }
-      if (selectedBranch) {
-        query = query.eq('branch', selectedBranch);
-      }
-      if (selectedTeam) {
-        query = query.eq('team_name', selectedTeam);
-      }
+      if (selectedProvince !== "all") query = query.eq('province', selectedProvince);
+      if (selectedCity !== "all") query = query.eq('city', selectedCity);
+      if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
+      if (selectedBranch !== "all") query = query.eq('branch', selectedBranch);
+      if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
 
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
@@ -122,14 +108,18 @@ const Dashboard = () => {
       };
 
       const dbColumn = columnMap[sortColumn] || sortColumn;
-      query = query.order(dbColumn, { ascending: sortDirection === 'asc' });
+      if (sortDirection === 'asc') {
+        query = query.order(dbColumn, { ascending: true, nullsLast: true });
+      } else {
+        query = query.order(dbColumn, { ascending: false, nullsFirst: true });
+      }
 
       const { data, count, error } = await query
         .range(pageNumber * ITEMS_PER_PAGE, (pageNumber + 1) * ITEMS_PER_PAGE - 1);
 
       if (error) throw error;
 
-      const formattedData = data?.map(advisor => ({
+      const formattedData = data.map(advisor => ({
         id: advisor.id,
         firstName: advisor.first_name,
         lastName: advisor.last_name,
@@ -142,7 +132,7 @@ const Dashboard = () => {
         email: advisor.email || '',
         websiteUrl: advisor.website_url || '',
         linkedinUrl: advisor.linkedin_url || ''
-      })) || [];
+      }));
 
       if (pageNumber === 0) {
         setAdvisors(formattedData);
@@ -159,31 +149,24 @@ const Dashboard = () => {
 
   const loadFilterOptions = async () => {
     try {
-      setIsLoadingFilters(true);
       let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
-      // Apply cascading filters
-      if (selectedProvince) {
+      if (selectedProvince !== "all") {
         query = query.eq('province', selectedProvince);
       }
-      if (selectedCity) {
+      if (selectedCity !== "all") {
         query = query.eq('city', selectedCity);
       }
-      if (selectedFirm) {
+      if (selectedFirm !== "all") {
         query = query.eq('firm', selectedFirm);
       }
-      if (selectedBranch) {
+      if (selectedBranch !== "all") {
         query = query.eq('branch', selectedBranch);
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-
-      if (!data) {
-        console.warn('No data returned from filter options query');
-        return;
-      }
 
       const options: FilterOptions = {
         provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
@@ -196,8 +179,6 @@ const Dashboard = () => {
       setFilterOptions(options);
     } catch (error) {
       console.error("Error loading filter options:", error);
-    } finally {
-      setIsLoadingFilters(false);
     }
   };
 
@@ -209,64 +190,31 @@ const Dashboard = () => {
     switch (filterType) {
       case 'province':
         setSelectedProvince(value);
-        setSelectedCity("");
-        setSelectedFirm("");
-        setSelectedBranch("");
-        setSelectedTeam("");
+        setSelectedCity('all');
+        setSelectedFirm('all');
+        setSelectedBranch('all');
+        setSelectedTeam('all');
         break;
       case 'city':
         setSelectedCity(value);
-        setSelectedFirm("");
-        setSelectedBranch("");
-        setSelectedTeam("");
+        setSelectedFirm('all');
+        setSelectedBranch('all');
+        setSelectedTeam('all');
         break;
       case 'firm':
         setSelectedFirm(value);
-        setSelectedBranch("");
-        setSelectedTeam("");
+        setSelectedBranch('all');
+        setSelectedTeam('all');
         break;
       case 'branch':
         setSelectedBranch(value);
-        setSelectedTeam("");
+        setSelectedTeam('all');
         break;
       case 'team':
         setSelectedTeam(value);
         break;
     }
 
-    setPage(0);
-    await loadAdvisors(0, searchQuery);
-  };
-
-  const removeFilter = async (type: string) => {
-    switch (type) {
-      case 'province':
-        setSelectedProvince("");
-        setSelectedCity("");
-        setSelectedFirm("");
-        setSelectedBranch("");
-        setSelectedTeam("");
-        break;
-      case 'city':
-        setSelectedCity("");
-        setSelectedFirm("");
-        setSelectedBranch("");
-        setSelectedTeam("");
-        break;
-      case 'firm':
-        setSelectedFirm("");
-        setSelectedBranch("");
-        setSelectedTeam("");
-        break;
-      case 'branch':
-        setSelectedBranch("");
-        setSelectedTeam("");
-        break;
-      case 'team':
-        setSelectedTeam("");
-        break;
-    }
-    
     setPage(0);
     await loadAdvisors(0, searchQuery);
   };
@@ -344,17 +292,19 @@ const Dashboard = () => {
   };
 
   const resetFilters = async () => {
-    setSelectedProvince("");
-    setSelectedCity("");
-    setSelectedFirm("");
-    setSelectedBranch("");
-    setSelectedTeam("");
+    setSelectedProvince("all");
+    setSelectedCity("all");
+    setSelectedFirm("all");
+    setSelectedBranch("all");
+    setSelectedTeam("all");
     setSelectedFavoritesList("all");
     setSelectedReportList("all");
     
     setSearchQuery("");
+    
     setSortColumn("firstName");
     setSortDirection("asc");
+    
     setPage(0);
     
     if (tableContainerRef.current) {
@@ -362,6 +312,7 @@ const Dashboard = () => {
     }
     
     await loadAdvisors(0, "");
+    
     await loadFilterOptions();
   };
 
@@ -376,77 +327,6 @@ const Dashboard = () => {
     }
     setPage(0);
     loadAdvisors(0, searchQuery);
-  };
-
-  const SelectedFilters = () => {
-    const hasFilters = selectedProvince || selectedCity || selectedFirm || selectedBranch || selectedTeam;
-
-    if (!hasFilters) return null;
-
-    return (
-      <div className="flex flex-wrap gap-2 mb-4">
-        {selectedProvince && (
-          <Badge 
-            variant="secondary"
-            className="flex items-center gap-1"
-          >
-            Province: {selectedProvince}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('province')}
-            />
-          </Badge>
-        )}
-        {selectedCity && (
-          <Badge 
-            variant="secondary"
-            className="flex items-center gap-1"
-          >
-            City: {selectedCity}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('city')}
-            />
-          </Badge>
-        )}
-        {selectedFirm && (
-          <Badge 
-            variant="secondary"
-            className="flex items-center gap-1"
-          >
-            Firm: {selectedFirm}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('firm')}
-            />
-          </Badge>
-        )}
-        {selectedBranch && (
-          <Badge 
-            variant="secondary"
-            className="flex items-center gap-1"
-          >
-            Branch: {selectedBranch}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('branch')}
-            />
-          </Badge>
-        )}
-        {selectedTeam && (
-          <Badge 
-            variant="secondary"
-            className="flex items-center gap-1"
-          >
-            Team: {selectedTeam}
-            <X 
-              className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('team')}
-            />
-          </Badge>
-        )}
-      </div>
-    );
   };
 
   if (isLoading) {
@@ -536,6 +416,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="All Provinces" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Provinces</SelectItem>
                 {filterOptions.provinces.map((province) => (
                   <SelectItem key={province} value={province}>
                     {province}
@@ -552,6 +433,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="All Cities" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Cities</SelectItem>
                 {filterOptions.cities.map((city) => (
                   <SelectItem key={city} value={city}>
                     {city}
@@ -568,6 +450,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="All Firms" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Firms</SelectItem>
                 {filterOptions.firms.map((firm) => (
                   <SelectItem key={firm} value={firm}>
                     {firm}
@@ -584,6 +467,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
                 {filterOptions.branches.map((branch) => (
                   <SelectItem key={branch} value={branch}>
                     {branch}
@@ -600,6 +484,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="All Teams" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
                 {filterOptions.teams.map((team) => (
                   <SelectItem key={team} value={team}>
                     {team}
@@ -617,8 +502,6 @@ const Dashboard = () => {
               </SelectContent>
             </Select>
           </div>
-
-          <SelectedFilters />
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={resetFilters}>
