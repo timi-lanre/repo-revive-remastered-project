@@ -1,4 +1,4 @@
-
+// src/pages/Admin.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -37,12 +37,23 @@ const Admin = () => {
       const pendingUsers = await authService.getPendingUsers();
       setUsers(pendingUsers);
       
-      // Load all users from auth and profiles
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      // Load all users from auth - this requires service role key
+      let authUsers: any[] = [];
       
-      if (authError) {
-        console.error("Error loading auth users:", authError);
-        throw authError;
+      try {
+        const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+        
+        if (authError) {
+          console.error("Error loading auth users:", authError);
+          // If we can't access auth.admin, we'll only show users with profiles
+          authUsers = [];
+        } else {
+          authUsers = authData.users || [];
+        }
+      } catch (error) {
+        console.error("Auth admin not accessible:", error);
+        // Fallback to only showing users with profiles
+        authUsers = [];
       }
       
       // Load all profile data
@@ -51,30 +62,56 @@ const Admin = () => {
         .select('*')
         .order('created_at', { ascending: false });
         
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error("Error loading profiles:", profileError);
+        throw profileError;
+      }
       
-      // Create a map of user IDs to profiles for quick lookup
-      const profileMap = new Map();
-      profiles.forEach(profile => {
-        profileMap.set(profile.user_id, profile);
-      });
+      console.log("Loaded profiles:", profiles);
+      console.log("Loaded auth users:", authUsers);
       
-      // Combine auth users with profiles
-      const usersWithProfile = authUsers.users.map(authUser => {
-        const profile = profileMap.get(authUser.id) || {};
-        
-        return {
-          id: authUser.id,
-          email: authUser.email || '',
-          firstName: profile.first_name || authUser.user_metadata?.first_name || '',
-          lastName: profile.last_name || authUser.user_metadata?.last_name || '',
-          status: profile.status || 'UNKNOWN',
-          role: profile.role || 'user',
-          createdAt: profile.created_at || authUser.created_at
-        };
-      });
+      // Create combined user list
+      const usersWithProfile: UserProfile[] = [];
       
+      // First, add all users from profiles table
+      if (profiles && profiles.length > 0) {
+        profiles.forEach(profile => {
+          const authUser = authUsers.find(user => user.id === profile.user_id);
+          
+          usersWithProfile.push({
+            id: profile.user_id,
+            email: profile.email || authUser?.email || 'No email',
+            firstName: profile.first_name || authUser?.user_metadata?.first_name || 'Unknown',
+            lastName: profile.last_name || authUser?.user_metadata?.last_name || 'Unknown',
+            status: profile.status || 'UNKNOWN',
+            role: profile.role || 'user',
+            createdAt: profile.created_at || authUser?.created_at || new Date().toISOString()
+          });
+        });
+      }
+      
+      // Then, add any auth users that don't have profiles
+      if (authUsers.length > 0) {
+        authUsers.forEach(authUser => {
+          const existsInProfiles = profiles?.some(profile => profile.user_id === authUser.id);
+          
+          if (!existsInProfiles) {
+            usersWithProfile.push({
+              id: authUser.id,
+              email: authUser.email || 'No email',
+              firstName: authUser.user_metadata?.first_name || 'Unknown',
+              lastName: authUser.user_metadata?.last_name || 'Unknown',
+              status: 'NO_PROFILE',
+              role: 'user',
+              createdAt: authUser.created_at
+            });
+          }
+        });
+      }
+      
+      console.log("Combined users:", usersWithProfile);
       setAllUsers(usersWithProfile);
+      
     } catch (error: any) {
       console.error("Error loading users:", error);
       setLoadingError(error.message || "Failed to load users");
@@ -123,6 +160,40 @@ const Admin = () => {
       toast({
         title: "Error",
         description: "Failed to send password reset email. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const createProfileForUser = async (userId: string, email: string, firstName: string, lastName: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .insert([
+          {
+            user_id: userId,
+            email: email,
+            first_name: firstName,
+            last_name: lastName,
+            status: "APPROVED",
+            role: "user"
+          }
+        ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Profile created for user.",
+      });
+
+      // Refresh the user list
+      await loadUsers();
+    } catch (error) {
+      console.error("Error creating profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create profile for user.",
         variant: "destructive"
       });
     }
@@ -297,7 +368,12 @@ const Admin = () => {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="all">All Users</TabsTrigger>
+            <TabsTrigger value="all">
+              All Users
+              <Badge variant="secondary" className="ml-2">
+                {allUsers.length}
+              </Badge>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="create">
@@ -377,7 +453,7 @@ const Admin = () => {
           <TabsContent value="all">
             <Card>
               <CardHeader>
-                <CardTitle>All Users</CardTitle>
+                <CardTitle>All Users ({allUsers.length})</CardTitle>
                 <CardDescription>
                   Manage all registered users
                 </CardDescription>
@@ -403,21 +479,37 @@ const Admin = () => {
                           </TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>
-                            <Badge variant={user.status === 'APPROVED' ? 'default' : 'secondary'}>
+                            <Badge variant={
+                              user.status === 'APPROVED' ? 'default' : 
+                              user.status === 'NO_PROFILE' ? 'destructive' : 
+                              'secondary'
+                            }>
                               {user.status}
                             </Badge>
                           </TableCell>
                           <TableCell>{user.role}</TableCell>
                           <TableCell>{formatDate(user.createdAt)}</TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleResetPassword(user.id, user.email)}
-                            >
-                              <Key className="h-4 w-4 mr-1" />
-                              Reset Password
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              {user.status === 'NO_PROFILE' ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => createProfileForUser(user.id, user.email, user.firstName, user.lastName)}
+                                >
+                                  Create Profile
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleResetPassword(user.id, user.email)}
+                                >
+                                  <Key className="h-4 w-4 mr-1" />
+                                  Reset Password
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
