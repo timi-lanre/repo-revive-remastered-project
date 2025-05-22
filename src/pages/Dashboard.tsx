@@ -13,15 +13,12 @@ import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
 
-// ... (previous interfaces and type definitions remain the same)
-
 const Dashboard = () => {
-  // ... (previous state and functions remain the same until the Dialog component)
+  const [showAdvisorDialog, setShowAdvisorDialog] = useState(false);
+  const [selectedAdvisor, setSelectedAdvisor] = useState(null);
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      {/* ... (previous JSX remains the same until the Dialog) */}
-
       {/* Advisor Info Dialog */}
       <Dialog open={showAdvisorDialog} onOpenChange={setShowAdvisorDialog}>
         <DialogContent className="max-w-2xl bg-[#E5D3BC]/5">
