@@ -80,7 +80,6 @@ export const signUp = async (
       ]);
 
     if (profileError) {
-      // Rollback: delete auth user if profile creation fails
       await supabase.auth.admin.deleteUser(user.id);
       throw profileError;
     }
@@ -169,19 +168,17 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
 
 export const resetPassword = async (userId: string): Promise<void> => {
   try {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('email')
-      .eq('user_id', userId)
-      .single();
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/reset-password/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+    });
 
-    if (!profile?.email) {
-      throw new Error('User email not found');
+    if (!response.ok) {
+      throw new Error('Failed to send password reset email');
     }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(profile.email);
-    
-    if (error) throw error;
   } catch (error: any) {
     console.error("Error resetting password:", error);
     throw error;

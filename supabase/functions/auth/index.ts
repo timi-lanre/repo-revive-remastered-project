@@ -82,7 +82,19 @@ async function sendEmail(to: string, subject: string, body: string) {
             Charset: "UTF-8",
           },
           Html: {
-            Data: body.replace(/\n/g, "<br>"),
+            Data: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background-color: #E5D3BC; padding: 20px; text-align: center;">
+                  <h1 style="color: #333; margin: 0;">Advisor Connect</h1>
+                </div>
+                <div style="padding: 20px; background-color: #fff; border: 1px solid #ddd;">
+                  ${body.replace(/\n/g, "<br>")}
+                </div>
+                <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
+                  © 2025 Advisor Connect. All rights reserved.
+                </div>
+              </div>
+            `,
             Charset: "UTF-8",
           },
         },
@@ -263,12 +275,43 @@ Deno.serve(async (req) => {
     if (path.startsWith("/reset-password/") && req.method === "POST") {
       const userId = path.split("/").pop();
       
-      const { error } = await supabase.auth.admin.generateLink({
+      const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(userId);
+      if (userError) throw userError;
+      
+      if (!user?.email) throw new Error("User email not found");
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('first_name')
+        .eq('user_id', userId)
+        .single();
+
+      const { data, error } = await supabase.auth.admin.generateLink({
         type: 'recovery',
-        userId,
+        email: user.email,
+        options: {
+          redirectTo: `${Deno.env.get('VITE_SUPABASE_URL')}/auth/v1/callback`,
+        }
       });
 
       if (error) throw error;
+
+      if (data?.properties?.action_link) {
+        await sendEmail(
+          user.email,
+          "Reset Your Advisor Connect Password",
+          `Dear ${profile?.first_name || 'User'},
+
+          You've requested to reset your password for Advisor Connect. Click the link below to set a new password:
+
+          ${data.properties.action_link}
+
+          If you didn't request this change, please ignore this email or contact support if you have concerns.
+
+          Best regards,
+          The Advisor Connect Team`
+        );
+      }
 
       return new Response(
         JSON.stringify({ message: "Password reset email sent" }),
