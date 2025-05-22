@@ -47,7 +47,6 @@ interface MultiSelectProps {
 
 const ITEMS_PER_PAGE = 50;
 
-// Multi-select dropdown component
 const MultiSelect: React.FC<MultiSelectProps> = ({ 
   value, 
   onChange, 
@@ -531,180 +530,28 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      {/* Advisor Info Dialog */}
-      <Dialog open={showAdvisorDialog} onOpenChange={setShowAdvisorDialog}>
-        <DialogContent className="max-w-3xl bg-gradient-to-br from-[#E5D3BC]/10 to-[#d6c3ac]/5 border-[#E5D3BC]/30 shadow-xl">
-          <DialogHeader className="bg-gradient-to-r from-[#E5D3BC] to-[#d6c3ac] p-6 rounded-t-lg -m-6 mb-4">
-            <DialogTitle className="text-2xl font-bold text-[#1E293B] flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <Heart className="h-6 w-6 text-[#1E293B]" />
-              </div>
-              Advisor Information
-            </DialogTitle>
-          </DialogHeader>
-          
-          <ScrollArea className="max-h-[70vh] overflow-auto pr-4">
-            {selectedAdvisor && (
-              <div className="space-y-6 p-2">
-                {/* Name and Title Section */}
-                <div className="bg-white/50 rounded-lg p-4 border border-[#E5D3BC]/20">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-1">Full Name</h3>
-                      <p className="text-xl font-bold text-gray-800">
-                        {selectedAdvisor.firstName && selectedAdvisor.lastName 
-                          ? `${selectedAdvisor.firstName} ${selectedAdvisor.lastName}`
-                          : selectedAdvisor.firstName || selectedAdvisor.lastName || ''}
-                      </p>
-                    </div>
-                    {selectedAdvisor.title && (
-                      <div>
-                        <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-1">Title</h3>
-                        <p className="text-xl font-medium text-gray-700">{selectedAdvisor.title}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Team Section */}
-                {selectedAdvisor.teamName && (
-                  <>
-                    <Separator className="bg-gradient-to-r from-transparent via-[#E5D3BC]/30 to-transparent" />
-                    <div className="bg-white/50 rounded-lg p-4 border border-[#E5D3BC]/20">
-                      <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-1">Team</h3>
-                      <p className="text-lg font-medium text-gray-700">{selectedAdvisor.teamName}</p>
-                    </div>
-                  </>
-                )}
-                
-                {/* Firm and Branch Section */}
-                {(selectedAdvisor.firm || selectedAdvisor.branch) && (
-                  <>
-                    <Separator className="bg-gradient-to-r from-transparent via-[#E5D3BC]/30 to-transparent" />
-                    <div className="bg-white/50 rounded-lg p-4 border border-[#E5D3BC]/20">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {selectedAdvisor.firm && (
-                          <div>
-                            <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-1">Firm</h3>
-                            <p className="text-lg font-medium text-gray-700">{selectedAdvisor.firm}</p>
-                          </div>
-                        )}
-                        {selectedAdvisor.branch && (
-                          <div>
-                            <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-1">Branch</h3>
-                            <p className="text-lg font-medium text-gray-700">{selectedAdvisor.branch}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-                
-                {/* Location Section */}
-                {(selectedAdvisor.city || selectedAdvisor.province) && (
-                  <>
-                    <Separator className="bg-gradient-to-r from-transparent via-[#E5D3BC]/30 to-transparent" />
-                    <div className="bg-white/50 rounded-lg p-4 border border-[#E5D3BC]/20">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {selectedAdvisor.city && (
-                          <div>
-                            <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-1">City</h3>
-                            <p className="text-lg font-medium text-gray-700">{selectedAdvisor.city}</p>
-                          </div>
-                        )}
-                        {selectedAdvisor.province && (
-                          <div>
-                            <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-1">Province</h3>
-                            <p className="text-lg font-medium text-gray-700">{selectedAdvisor.province}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-                
-                {/* Contact Information Section */}
-                {(selectedAdvisor.email || selectedAdvisor.websiteUrl || selectedAdvisor.linkedinUrl) && (
-                  <>
-                    <Separator className="bg-gradient-to-r from-transparent via-[#E5D3BC]/30 to-transparent" />
-                    <div className="bg-white/50 rounded-lg p-4 border border-[#E5D3BC]/20">
-                      <h3 className="font-semibold text-[#E5D3BC] text-sm uppercase tracking-wide mb-3">Contact Information</h3>
-                      <div className="space-y-3">
-                        {selectedAdvisor.email && (
-                          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg hover:bg-white/80 transition-colors">
-                            <div className="flex-shrink-0 w-10 h-10 bg-[#E5D3BC]/20 rounded-full flex items-center justify-center">
-                              <Mail className="h-5 w-5 text-[#E5D3BC]" />
-                            </div>
-                            <a 
-                              href={`mailto:${selectedAdvisor.email}`}
-                              className="text-[#E5D3BC] hover:text-[#d6c3ac] font-medium hover:underline transition-colors"
-                            >
-                              {selectedAdvisor.email}
-                            </a>
-                          </div>
-                        )}
-                        {selectedAdvisor.websiteUrl && (
-                          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg hover:bg-white/80 transition-colors">
-                            <div className="flex-shrink-0 w-10 h-10 bg-[#E5D3BC]/20 rounded-full flex items-center justify-center">
-                              <Globe className="h-5 w-5 text-[#E5D3BC]" />
-                            </div>
-                            <a 
-                              href={selectedAdvisor.websiteUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#E5D3BC] hover:text-[#d6c3ac] font-medium hover:underline transition-colors"
-                            >
-                              Visit Website
-                            </a>
-                          </div>
-                        )}
-                        {selectedAdvisor.linkedinUrl && (
-                          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg hover:bg-white/80 transition-colors">
-                            <div className="flex-shrink-0 w-10 h-10 bg-[#E5D3BC]/20 rounded-full flex items-center justify-center">
-                              <Linkedin className="h-5 w-5 text-[#E5D3BC]" />
-                            </div>
-                            <a 
-                              href={selectedAdvisor.linkedinUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#E5D3BC] hover:text-[#d6c3ac] font-medium hover:underline transition-colors"
-                            >
-                              LinkedIn Profile
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      {/* Header */}
-      <div className="w-full px-4 sm:px-8 md:px-12 py-4 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
+      {/* Header - Reduced size */}
+      <div className="w-full px-4 sm:px-8 md:px-12 py-3 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto">
             <img
               src="/lovable-uploads/8af3a359-89c1-4bf8-a9ea-f2255c283985.png"
               alt="Advisor Connect"
-              className="object-contain"
+              className="h-8 object-contain"
             />
           </div>
           
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
-              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-black/10
+              className="relative text-[#1E293B] font-semibold text-sm px-3 py-1 rounded-lg border border-black/10
                 bg-white/20 text-black after:content-[''] after:absolute after:bottom-0 after:left-[10%] after:w-4/5 after:h-0.5 after:bg-black"
             >
               Home
             </Button>
             <Button
               variant="ghost"
-              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-transparent
+              className="relative text-[#1E293B] font-semibold text-sm px-3 py-1 rounded-lg border border-transparent
                 hover:bg-white/20 hover:border-black/10 hover:text-black hover:-translate-y-0.5 transition-all duration-300"
               onClick={() => navigate("/about")}
             >
@@ -712,7 +559,7 @@ const Dashboard = () => {
             </Button>
             <Button
               variant="ghost"
-              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-transparent
+              className="relative text-[#1E293B] font-semibold text-sm px-3 py-1 rounded-lg border border-transparent
                 hover:bg-white/20 hover:border-black/10 hover:text-black hover:-translate-y-0.5 transition-all duration-300"
               onClick={handleLogout}
             >
@@ -724,28 +571,28 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <div className="w-full max-w-[1800px] mx-auto px-4 py-4">
-        {/* Welcome Section - Compact */}
+        {/* Welcome Section - More compact */}
         <div className="mb-4">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-xl font-bold text-[#111827] mb-1">
+              <h1 className="text-lg font-bold text-[#111827] mb-1">
                 Welcome back, {userName}
               </h1>
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600">
                 Last login: {lastLogin || "Loading..."}
               </p>
             </div>
             
             {latestNews && (
-              <div className="flex items-start gap-2 text-gray-600 bg-[#E5D3BC]/10 p-3 rounded-lg border border-[#E5D3BC] max-w-md">
+              <div className="flex items-start gap-2 text-gray-600 bg-[#E5D3BC]/10 p-2 rounded-lg border border-[#E5D3BC] max-w-md">
                 <Info className="h-4 w-4 text-[#E5D3BC] mt-0.5 flex-shrink-0" />
-                <p className="text-sm">Latest News: {latestNews}</p>
+                <p className="text-xs">Latest News: {latestNews}</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Compact Filters Section */}
+        {/* Filters Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <Search className="h-4 w-4 text-gray-400" />
@@ -787,23 +634,23 @@ const Dashboard = () => {
             </div>
 
             <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Branch</label>
+              <MultiSelect
+                value={selectedBranches}
+                onChange={setSelectedBranches}
+                options={filterOptions.branches}
+                placeholder="Branch"
+                showAll={true}
+              />
+            </div>
+
+            <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Team</label>
               <MultiSelect
                 value={selectedTeams}
                 onChange={setSelectedTeams}
                 options={filterOptions.teams}
                 placeholder="Team"
-                showAll={true}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Favorites List</label>
-              <MultiSelect
-                value={[]}
-                onChange={() => {}}
-                options={[]}
-                placeholder="Favorites List"
                 showAll={true}
               />
             </div>
