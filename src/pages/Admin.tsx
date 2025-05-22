@@ -35,7 +35,7 @@ const Admin = () => {
       const pendingUsers = await authService.getPendingUsers();
       setUsers(pendingUsers);
       
-      // Load all users
+      // Load all users directly from the database
       const { data: profiles, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -46,7 +46,7 @@ const Admin = () => {
       // Transform the profiles into the required format
       const usersWithEmail = profiles.map(profile => ({
         id: profile.user_id,
-        email: profile.email,
+        email: profile.email || '',
         firstName: profile.first_name,
         lastName: profile.last_name,
         status: profile.status,
