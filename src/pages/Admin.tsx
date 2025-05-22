@@ -1,13 +1,14 @@
+
 // src/pages/Admin.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { authService, PendingUser, UserStatus } from "@/services/auth";
+import { authService, UserStatus } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, UserX, RefreshCcw, LogOut, LayoutDashboard, Key, UserPlus } from "lucide-react";
+import { RefreshCcw, LogOut, LayoutDashboard, Key, UserPlus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 import CreateUserForm from "@/components/admin/CreateUserForm";
@@ -26,17 +27,12 @@ const Admin = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [users, setUsers] = useState<PendingUser[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
   const loadUsers = async () => {
     try {
-      // Load pending users
-      const pendingUsers = await authService.getPendingUsers();
-      setUsers(pendingUsers);
-      
       // Load all users from auth - this requires service role key
       let authUsers: any[] = [];
       
@@ -239,48 +235,6 @@ const Admin = () => {
     
     checkAuth();
   }, [navigate]);
-  
-  const handleApproveUser = async (userId: string) => {
-    try {
-      const result = await authService.approveUser(userId);
-      if (result.success) {
-        setUsers(users.filter(user => user.id !== userId));
-        await loadUsers(); // Reload all users to update the lists
-        toast({
-          title: "Success",
-          description: "User has been approved successfully."
-        });
-      }
-    } catch (error) {
-      console.error("Error approving user:", error);
-      toast({
-        title: "Error",
-        description: "Failed to approve user.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  const handleRejectUser = async (userId: string) => {
-    try {
-      const result = await authService.rejectUser(userId);
-      if (result.success) {
-        setUsers(users.filter(user => user.id !== userId));
-        await loadUsers(); // Reload all users to update the lists
-        toast({
-          title: "Success",
-          description: "User has been rejected successfully."
-        });
-      }
-    } catch (error) {
-      console.error("Error rejecting user:", error);
-      toast({
-        title: "Error",
-        description: "Failed to reject user.",
-        variant: "destructive"
-      });
-    }
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -307,8 +261,6 @@ const Admin = () => {
   if (!isAdmin) {
     return null;
   }
-
-  const pendingUsers = users.filter(user => user.status === UserStatus.PENDING);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -360,14 +312,6 @@ const Admin = () => {
               <UserPlus className="h-4 w-4 mr-2" />
               Create User
             </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending Requests
-              {pendingUsers.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {pendingUsers.length}
-                </Badge>
-              )}
-            </TabsTrigger>
             <TabsTrigger value="all">
               All Users
               <Badge variant="secondary" className="ml-2">
@@ -378,76 +322,6 @@ const Admin = () => {
 
           <TabsContent value="create">
             <CreateUserForm />
-          </TabsContent>
-
-          <TabsContent value="pending">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Approval Requests</CardTitle>
-                <CardDescription>
-                  Review and manage new user registration requests
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {pendingUsers.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                      <UserCheck className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <h3 className="text-sm font-medium text-gray-900">No Pending Requests</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      All user requests have been processed
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Requested</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {pendingUsers.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium">
-                              {user.firstName} {user.lastName}
-                            </TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>{formatDate(user.createdAt)}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="border-green-600 text-green-600 hover:bg-green-50"
-                                  onClick={() => handleApproveUser(user.id)}
-                                >
-                                  <UserCheck className="h-4 w-4 mr-1" />
-                                  Approve
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="border-red-600 text-red-600 hover:bg-red-50"
-                                  onClick={() => handleRejectUser(user.id)}
-                                >
-                                  <UserX className="h-4 w-4 mr-1" />
-                                  Reject
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="all">
