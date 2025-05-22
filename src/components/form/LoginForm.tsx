@@ -25,9 +25,15 @@ const LoginForm = () => {
         try {
           const isAdmin = await authService.isAdmin();
           window.location.href = isAdmin ? "/admin" : "/dashboard";
-        } catch (roleError) {
+        } catch (roleError: any) {
           console.error("Error checking admin status:", roleError);
-          setError("Failed to verify user role. Please try again or contact support.");
+          if (roleError.message.includes('Network error')) {
+            setError("Unable to verify user role due to network issues. Please check your connection and try again.");
+          } else if (roleError.message.includes('No user found')) {
+            setError("User profile not found. Please contact support.");
+          } else {
+            setError("Failed to verify user role. Please try again or contact support.");
+          }
           setIsLoading(false);
           return;
         }
@@ -37,7 +43,11 @@ const LoginForm = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      setError(error.message || "Failed to login. Please try again later.");
+      if (error.message.includes('Network error')) {
+        setError("Unable to connect to the server. Please check your internet connection.");
+      } else {
+        setError(error.message || "Failed to login. Please try again later.");
+      }
       setIsLoading(false);
     }
   };

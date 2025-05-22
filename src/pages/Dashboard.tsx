@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Bell, Info, Search } from "lucide-react";
+import { Bell, Info, Search, ChevronUp } from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
@@ -41,6 +41,8 @@ const Dashboard = () => {
   const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
+  const [sortColumn, setSortColumn] = useState("firstName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // Filters
   const [selectedProvince, setSelectedProvince] = useState<string>("");
@@ -72,10 +74,12 @@ const Dashboard = () => {
       if (selectedBranch) query = query.eq('branch', selectedBranch);
       if (selectedTeam) query = query.eq('team_name', selectedTeam);
 
+      // Add sorting
+      query = query.order(sortColumn, { ascending: sortDirection === 'asc' });
+
       // Add pagination
       const { data, count, error } = await query
-        .range(pageNumber * ITEMS_PER_PAGE, (pageNumber + 1) * ITEMS_PER_PAGE - 1)
-        .order('last_name', { ascending: true });
+        .range(pageNumber * ITEMS_PER_PAGE, (pageNumber + 1) * ITEMS_PER_PAGE - 1);
 
       if (error) throw error;
 
@@ -144,7 +148,7 @@ const Dashboard = () => {
           .select('content')
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (newsData) {
           setLatestNews(newsData.content);
@@ -188,6 +192,17 @@ const Dashboard = () => {
     loadAdvisors(0, searchQuery);
   };
 
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+    setPage(0);
+    loadAdvisors(0, searchQuery);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -200,10 +215,10 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <img
@@ -222,7 +237,7 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">
@@ -233,29 +248,13 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Database Stats */}
-        <Card className="p-4 mb-8 bg-[#E5D3BC]/10 border-[#E5D3BC]">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
-            <div>
-              <h2 className="font-medium text-gray-900">Database Status</h2>
-              <p className="text-gray-600 mt-1">
-                Total Advisors: {totalAdvisors.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </Card>
-
         {/* Latest News */}
-        <Card className="p-4 mb-8 bg-[#E5D3BC]/10 border-[#E5D3BC]">
-          <div className="flex items-start gap-3">
-            <Bell className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
-            <div>
-              <h2 className="font-medium text-gray-900">Latest News</h2>
-              <p className="text-gray-600 mt-1">{latestNews || "No updates available"}</p>
-            </div>
-          </div>
-        </Card>
+        <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
+          <Bell className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
+          <p>
+            Latest News: {latestNews || "No updates available"}
+          </p>
+        </div>
 
         {/* Search and Filters */}
         <div className="mb-6">
@@ -283,8 +282,17 @@ const Dashboard = () => {
                 <SelectValue placeholder="Province" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Provinces</SelectItem>
-                {/* Add province options */}
+                <SelectItem value="">All Provinces</SelectItem>
+                <SelectItem value="AB">Alberta</SelectItem>
+                <SelectItem value="BC">British Columbia</SelectItem>
+                <SelectItem value="MB">Manitoba</SelectItem>
+                <SelectItem value="NB">New Brunswick</SelectItem>
+                <SelectItem value="NL">Newfoundland</SelectItem>
+                <SelectItem value="NS">Nova Scotia</SelectItem>
+                <SelectItem value="ON">Ontario</SelectItem>
+                <SelectItem value="PE">Prince Edward Island</SelectItem>
+                <SelectItem value="QC">Quebec</SelectItem>
+                <SelectItem value="SK">Saskatchewan</SelectItem>
               </SelectContent>
             </Select>
 
@@ -293,8 +301,8 @@ const Dashboard = () => {
                 <SelectValue placeholder="City" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Cities</SelectItem>
-                {/* Add city options */}
+                <SelectItem value="">All Cities</SelectItem>
+                {/* Add city options dynamically based on province */}
               </SelectContent>
             </Select>
 
@@ -303,7 +311,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Firm" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Firms</SelectItem>
+                <SelectItem value="">All Firms</SelectItem>
                 {/* Add firm options */}
               </SelectContent>
             </Select>
@@ -313,7 +321,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Branch" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
+                <SelectItem value="">All Branches</SelectItem>
                 {/* Add branch options */}
               </SelectContent>
             </Select>
@@ -323,7 +331,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Team" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
+                <SelectItem value="">All Teams</SelectItem>
                 {/* Add team options */}
               </SelectContent>
             </Select>
@@ -336,11 +344,27 @@ const Dashboard = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    First Name
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('firstName')}
+                  >
+                    <div className="flex items-center gap-1">
+                      First Name
+                      {sortColumn === 'firstName' && (
+                        <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                      )}
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Name
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    onClick={() => handleSort('lastName')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Last Name
+                      {sortColumn === 'lastName' && (
+                        <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                      )}
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Team Name
