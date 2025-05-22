@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
@@ -23,16 +22,21 @@ const LoginForm = () => {
       const result = await authService.loginWithEmailPassword(email, password);
       
       if (result.success) {
-        // Redirect to dashboard/admin page based on role
-        const isAdmin = await authService.isAdmin();
-        window.location.href = isAdmin ? "/admin" : "/dashboard";
+        try {
+          const isAdmin = await authService.isAdmin();
+          window.location.href = isAdmin ? "/admin" : "/dashboard";
+        } catch (roleError) {
+          console.error("Error checking admin status:", roleError);
+          // Default to dashboard if role check fails
+          window.location.href = "/dashboard";
+        }
       } else {
         setError("Invalid credentials. Please check your email and password.");
         setIsLoading(false);
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      setError(error.message || "Failed to login");
+      setError(error.message || "Failed to login. Please try again later.");
       setIsLoading(false);
     }
   };

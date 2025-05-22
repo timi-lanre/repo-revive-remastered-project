@@ -2,26 +2,38 @@ import { supabase } from '@/lib/supabase';
 
 export const getCurrentUser = async () => {
   try {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw error;
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('Error getting auth user:', authError);
+      return null;
+    }
     
     if (!user) return null;
 
-    // Get user profile with specific columns
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id, user_id, first_name, last_name, role, status')
-      .eq('user_id', user.id)
-      .single();
+    try {
+      // Get user profile with specific columns
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id, user_id, first_name, last_name, role, status')
+        .eq('user_id', user.id)
+        .single();
 
-    if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Error getting user profile:', profileError);
+        return null;
+      }
 
-    return {
-      ...user,
-      ...profile
-    };
+      return {
+        ...user,
+        ...profile
+      };
+    } catch (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      return null;
+    }
   } catch (error) {
-    console.error('Error getting current user:', error);
+    console.error('Error in getCurrentUser:', error);
     return null;
   }
 };
