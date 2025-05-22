@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -25,8 +24,9 @@ const LandingHeader = () => {
             hover:bg-white/20 hover:border-black/10 hover:text-black hover:-translate-y-0.5 transition-all duration-300
             after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:w-0 after:h-0.5 after:bg-black
             after:transition-all after:duration-300 hover:after:w-4/5 hover:after:left-[10%]"
+          asChild
         >
-          About
+          <Link to="/about">About</Link>
         </Button>
         <Link to="/login">
           <Button
@@ -43,5 +43,3 @@ const LandingHeader = () => {
     </div>
   );
 };
-
-export default LandingHeader;

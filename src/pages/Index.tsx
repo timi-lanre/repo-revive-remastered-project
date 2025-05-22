@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import LandingHeader from "@/components/LandingHeader";
@@ -34,13 +33,15 @@ const Index = () => {
                   Get Started
                 </Button>
               </Link>
-              <Button
-                variant="outline"
-                className="border-black/10 text-[#1E293B] rounded-xl px-8 py-6 font-semibold text-base
-                  hover:border-[#E5D3BC] hover:bg-[#E5D3BC]/5 hover:-translate-y-0.5 transition-all"
-              >
-                Learn More
-              </Button>
+              <Link to="/about">
+                <Button
+                  variant="outline"
+                  className="border-black/10 text-[#1E293B] rounded-xl px-8 py-6 font-semibold text-base
+                    hover:border-[#E5D3BC] hover:bg-[#E5D3BC]/5 hover:-translate-y-0.5 transition-all"
+                >
+                  Learn More
+                </Button>
+              </Link>
             </div>
           </div>
           
