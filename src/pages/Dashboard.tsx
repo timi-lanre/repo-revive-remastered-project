@@ -39,6 +39,10 @@ interface FilterOptions {
 }
 
 const ITEMS_PER_PAGE = 50;
+const ROW_HEIGHT = 53;
+const HEADER_HEIGHT = 48;
+const VISIBLE_ROWS = 13;
+const TABLE_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS + HEADER_HEIGHT;
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -521,7 +525,11 @@ const Dashboard = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div style={{ height: 'calc(13 * 53px + 48px)' }} className="overflow-auto">
+          <div 
+            ref={tableContainerRef}
+            style={{ height: `${TABLE_HEIGHT}px` }} 
+            className="overflow-auto"
+          >
             <table className="w-full border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -560,7 +568,7 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
-                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ height: '53px' }}>
+                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ height: `${ROW_HEIGHT}px` }}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {advisor.firstName}
                     </td>
