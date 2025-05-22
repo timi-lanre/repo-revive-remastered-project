@@ -1,5 +1,5 @@
 
-import { Issuer as OidcIssuer } from 'openid-client';
+import { Issuer } from 'openid-client';
 import { cognitoConfig } from "@/config/cognito";
 
 // Initialize OIDC client
@@ -10,7 +10,7 @@ export const initializeOidcClient = async () => {
 
   try {
     // Discover the OIDC provider
-    const cognitoIssuer = await OidcIssuer.discover(
+    const cognitoIssuer = await Issuer.discover(
       `https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}/.well-known/openid-configuration`
     );
 
