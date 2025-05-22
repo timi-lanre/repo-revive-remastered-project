@@ -525,27 +525,27 @@ const Dashboard = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(13 * 53px + 48px)' }}>
+          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(13 * 65px + 48px)' }}>
             <table className="w-full table-fixed border-collapse min-w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   {[
-                    { key: 'firstName', label: 'First Name', width: '120px' },
-                    { key: 'lastName', label: 'Last Name', width: '120px' },
-                    { key: 'teamName', label: 'Team Name', width: '180px' },
-                    { key: 'title', label: 'Title', width: '180px' },
-                    { key: 'firm', label: 'Firm', width: '140px' },
-                    { key: 'branch', label: 'Branch', width: '180px' },
-                    { key: 'city', label: 'City', width: '120px' },
-                    { key: 'province', label: 'Province', width: '100px' },
-                    { key: 'actions', label: 'Actions', width: '160px' }
+                    { key: 'firstName', label: 'First Name', width: '8%' },
+                    { key: 'lastName', label: 'Last Name', width: '8%' },
+                    { key: 'teamName', label: 'Team Name', width: '14%' },
+                    { key: 'title', label: 'Title', width: '18%' },
+                    { key: 'firm', label: 'Firm', width: '12%' },
+                    { key: 'branch', label: 'Branch', width: '12%' },
+                    { key: 'city', label: 'City', width: '8%' },
+                    { key: 'province', label: 'Province', width: '6%' },
+                    { key: 'actions', label: 'Actions', width: '14%' }
                   ].map((column) => (
                     <th
                       key={column.key}
                       onClick={() => column.key !== 'actions' && handleSort(column.key)}
                       className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
                         column.key !== 'actions' ? 'cursor-pointer hover:bg-gray-100' : ''
-                      } ${column.key === 'actions' ? 'text-center sticky right-0 bg-gray-50' : ''}`}
+                      } ${column.key === 'actions' ? 'text-center' : ''}`}
                       style={{ width: column.width }}
                     >
                       <div className="flex items-center gap-1">
@@ -564,32 +564,32 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
-                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ height: '53px' }}>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ minHeight: '65px' }}>
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.firstName}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.lastName}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.teamName}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.title}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.firm}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.branch}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.city}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.province}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                    <td className="px-3 py-4 text-sm text-gray-500 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <Button
                           variant="ghost"
