@@ -23,15 +23,23 @@ interface UserTableProps {
 
 const UserTable: React.FC<UserTableProps> = ({ users, handleResetPassword, createProfileForUser }) => {
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return "Invalid date";
+    }
   };
+
+  // Log the users received by the component for debugging
+  console.log("UserTable received users:", users.length);
 
   return (
     <div className="overflow-x-auto">

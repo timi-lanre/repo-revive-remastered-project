@@ -38,7 +38,7 @@ const Admin = () => {
     try {
       console.log("Loading user profiles...");
       
-      // Get all user profiles - use a more direct query
+      // Use a more direct query approach with no filtering to get ALL profiles
       const { data: profiles, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -76,6 +76,11 @@ const Admin = () => {
         role: profile.role || 'user',
         createdAt: profile.created_at || new Date().toISOString()
       }));
+
+      // Log each user for debugging
+      formattedUsers.forEach((user, index) => {
+        console.log(`User ${index + 1}:`, user.firstName, user.lastName, user.email, user.role);
+      });
 
       setAllUsers(formattedUsers);
       setLoadingError(null);
@@ -229,7 +234,7 @@ const Admin = () => {
           console.error("Error in auto-refresh:", error);
         });
       }
-    }, 60000); // Refresh every minute
+    }, 30000); // Refresh every 30 seconds instead of every minute
     
     return () => {
       window.removeEventListener('userCreated', handleUserCreated);
