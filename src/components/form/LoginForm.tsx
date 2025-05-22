@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { authService } from "@/services/auth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import FormErrorAlert from "./FormErrorAlert";
+import { checkSupabaseConnection } from "@/lib/supabase";
 
 const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -12,12 +13,29 @@ const LoginForm = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   
+  // Check connection on component mount
+  useEffect(() => {
+    const checkConnection = async () => {
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        setError("Unable to connect to the authentication service. Please check your internet connection.");
+      }
+    };
+    checkConnection();
+  }, []);
+  
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
     
     try {
+      // Check connection before attempting login
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        throw new Error("Unable to connect to the authentication service. Please check your internet connection.");
+      }
+
       const result = await authService.loginWithEmailPassword(email, password);
       
       if (result.success) {
@@ -37,7 +55,7 @@ const LoginForm = () => {
       console.error("Login error:", error);
       let errorMessage = "An unexpected error occurred. Please try again later.";
       
-      if (error.message.includes('Network error')) {
+      if (error.message.includes('Network error') || error.message.includes('Failed to fetch') || error instanceof TypeError) {
         errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
       } else if (error.message.includes('Invalid credentials')) {
         errorMessage = "Invalid email or password. Please try again.";

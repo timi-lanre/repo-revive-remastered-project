@@ -1,12 +1,18 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, checkSupabaseConnection } from '@/lib/supabase';
 
 export const getCurrentUser = async () => {
   try {
+    // First check if we can connect to Supabase
+    const isConnected = await checkSupabaseConnection();
+    if (!isConnected) {
+      throw new Error('Unable to connect to the authentication service. Please check your internet connection and try again.');
+    }
+
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError) {
       console.error('Error getting auth user:', authError.message);
-      if (authError.message.includes('Failed to fetch')) {
+      if (authError.message.includes('Failed to fetch') || authError instanceof TypeError) {
         throw new Error('Network error: Unable to connect to authentication service. Please check your internet connection.');
       }
       throw new Error(`Authentication error: ${authError.message}`);
@@ -24,7 +30,7 @@ export const getCurrentUser = async () => {
 
       if (profileError) {
         console.error('Error getting user profile:', profileError.message);
-        if (profileError.message.includes('Failed to fetch')) {
+        if (profileError.message.includes('Failed to fetch') || profileError instanceof TypeError) {
           throw new Error('Network error: Unable to connect to database. Please check your internet connection.');
         }
         throw new Error(`Profile error: ${profileError.message}`);
@@ -65,6 +71,12 @@ export const isAuthenticated = async (): Promise<boolean> => {
 
 export const isAdmin = async (): Promise<boolean> => {
   try {
+    // First check if we can connect to Supabase
+    const isConnected = await checkSupabaseConnection();
+    if (!isConnected) {
+      throw new Error('Unable to connect to the authentication service. Please check your internet connection and try again.');
+    }
+
     const user = await getCurrentUser();
     if (!user) {
       throw new Error('No user found. Please sign in again.');
@@ -73,7 +85,7 @@ export const isAdmin = async (): Promise<boolean> => {
   } catch (error) {
     console.error("Error checking admin status:", error);
     if (error instanceof Error) {
-      if (error.message.includes('Network error')) {
+      if (error.message.includes('Network error') || error instanceof TypeError) {
         throw new Error('Unable to verify admin status due to network issues. Please check your internet connection and try again.');
       }
       throw error;
