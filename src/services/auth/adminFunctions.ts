@@ -1,4 +1,4 @@
-
+// src/services/auth/adminFunctions.ts
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 
@@ -41,18 +41,20 @@ const sendEmail = async (type: 'approval' | 'rejection' | 'account_created', ema
         email, 
         firstName, 
         password,
-        loginUrl: window.location.origin + '/login'
+        loginUrl: 'https://advisorconnect.ca/login'
       }),
     });
 
     if (!response.ok) {
-      console.error('Email API response:', await response.text());
+      const errorText = await response.text();
+      console.error('Email API response:', errorText);
       throw new Error('Failed to send email notification');
     }
     
     console.log('Email sent successfully');
   } catch (error) {
     console.error('Error sending email:', error);
+    // Don't throw here - we don't want email failures to prevent user creation
   }
 };
 
@@ -62,26 +64,39 @@ export const createUser = async (
   email: string
 ): Promise<{ success: boolean }> => {
   try {
-    // Check if user already exists
-    const { data: existingUser, error: checkError } = await supabase
+    // Check if user already exists in auth.users
+    const { data: existingAuthUsers, error: authCheckError } = await supabase.auth.admin.listUsers();
+    
+    if (authCheckError) {
+      console.error('Error checking existing auth users:', authCheckError);
+      throw new Error(`Failed to check existing users: ${authCheckError.message}`);
+    }
+
+    const existingAuthUser = existingAuthUsers.users.find(user => user.email === email);
+    if (existingAuthUser) {
+      throw new Error("A user with this email already exists");
+    }
+
+    // Check if user exists in profiles table
+    const { data: existingProfile, error: profileCheckError } = await supabase
       .from('user_profiles')
       .select('user_id')
       .eq('email', email)
       .maybeSingle();
       
-    if (checkError) {
-      console.error('Error checking existing user:', checkError);
-      throw new Error(`Database error: ${checkError.message}`);
+    if (profileCheckError) {
+      console.error('Error checking existing profile:', profileCheckError);
+      throw new Error(`Database error: ${profileCheckError.message}`);
     }
 
-    if (existingUser) {
+    if (existingProfile) {
       throw new Error("A user with this email already exists");
     }
 
     // Generate a random password
     const password = generateRandomPassword();
     
-    // Create user via the Edge Function instead of client-side admin API
+    // Create user via the Edge Function
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/create-user`, {
       method: 'POST',
       headers: {
@@ -264,7 +279,7 @@ export const resetPassword = async (userId: string): Promise<void> => {
 
     // Send password reset email
     const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `https://advisorconnect.ca/reset-password`,
     });
 
     if (error) throw error;
