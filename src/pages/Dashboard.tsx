@@ -45,11 +45,11 @@ const Dashboard = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // Filters
-  const [selectedProvince, setSelectedProvince] = useState<string>("");
-  const [selectedCity, setSelectedCity] = useState<string>("");
-  const [selectedFirm, setSelectedFirm] = useState<string>("");
-  const [selectedBranch, setSelectedBranch] = useState<string>("");
-  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [selectedProvince, setSelectedProvince] = useState<string>("all");
+  const [selectedCity, setSelectedCity] = useState<string>("all");
+  const [selectedFirm, setSelectedFirm] = useState<string>("all");
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
 
   // Infinite scroll
   const { ref, inView } = useInView({
@@ -68,14 +68,21 @@ const Dashboard = () => {
       }
 
       // Apply filters
-      if (selectedProvince) query = query.eq('province', selectedProvince);
-      if (selectedCity) query = query.eq('city', selectedCity);
-      if (selectedFirm) query = query.eq('firm', selectedFirm);
-      if (selectedBranch) query = query.eq('branch', selectedBranch);
-      if (selectedTeam) query = query.eq('team_name', selectedTeam);
+      if (selectedProvince !== "all") query = query.eq('province', selectedProvince);
+      if (selectedCity !== "all") query = query.eq('city', selectedCity);
+      if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
+      if (selectedBranch !== "all") query = query.eq('branch', selectedBranch);
+      if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
 
-      // Add sorting
-      query = query.order(sortColumn, { ascending: sortDirection === 'asc' });
+      // Map frontend column names to database column names for sorting
+      const columnMap: Record<string, string> = {
+        firstName: 'first_name',
+        lastName: 'last_name',
+      };
+
+      // Add sorting using the correct column names
+      const dbColumn = columnMap[sortColumn] || sortColumn;
+      query = query.order(dbColumn, { ascending: sortDirection === 'asc' });
 
       // Add pagination
       const { data, count, error } = await query
@@ -183,11 +190,11 @@ const Dashboard = () => {
   };
 
   const resetFilters = () => {
-    setSelectedProvince("");
-    setSelectedCity("");
-    setSelectedFirm("");
-    setSelectedBranch("");
-    setSelectedTeam("");
+    setSelectedProvince("all");
+    setSelectedCity("all");
+    setSelectedFirm("all");
+    setSelectedBranch("all");
+    setSelectedTeam("all");
     setPage(0);
     loadAdvisors(0, searchQuery);
   };
@@ -282,7 +289,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Province" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Provinces</SelectItem>
+                <SelectItem value="all">All Provinces</SelectItem>
                 <SelectItem value="AB">Alberta</SelectItem>
                 <SelectItem value="BC">British Columbia</SelectItem>
                 <SelectItem value="MB">Manitoba</SelectItem>
@@ -301,7 +308,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="City" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Cities</SelectItem>
+                <SelectItem value="all">All Cities</SelectItem>
                 {/* Add city options dynamically based on province */}
               </SelectContent>
             </Select>
@@ -311,7 +318,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Firm" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Firms</SelectItem>
+                <SelectItem value="all">All Firms</SelectItem>
                 {/* Add firm options */}
               </SelectContent>
             </Select>
@@ -321,7 +328,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Branch" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Branches</SelectItem>
+                <SelectItem value="all">All Branches</SelectItem>
                 {/* Add branch options */}
               </SelectContent>
             </Select>
@@ -331,7 +338,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Team" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Teams</SelectItem>
+                <SelectItem value="all">All Teams</SelectItem>
                 {/* Add team options */}
               </SelectContent>
             </Select>
