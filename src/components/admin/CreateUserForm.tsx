@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { authService } from "@/services/auth";
-import { Loader2, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import FormErrorAlert from '@/components/form/FormErrorAlert';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const CreateUserForm = () => {
   const [firstName, setFirstName] = useState('');
@@ -16,10 +17,12 @@ const CreateUserForm = () => {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(false);
     
     // Basic validation
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
@@ -42,6 +45,7 @@ const CreateUserForm = () => {
       const result = await authService.createUser(firstName, lastName, email);
       
       if (result.success) {
+        setSuccess(true);
         toast({
           title: "User Created Successfully",
           description: `User ${firstName} ${lastName} has been created. An email with login credentials has been sent to ${email}.`
@@ -88,6 +92,15 @@ const CreateUserForm = () => {
       </CardHeader>
       <CardContent>
         {error && <FormErrorAlert error={error} />}
+        
+        {success && (
+          <Alert className="mb-4 bg-green-50 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">
+              User created successfully! They will receive an email with login instructions.
+            </AlertDescription>
+          </Alert>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
