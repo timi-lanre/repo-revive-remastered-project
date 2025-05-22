@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
-import { Client } from "npm:mysql2/promise";
+import mysql from 'npm:mysql2/promise';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,14 +32,14 @@ Deno.serve(async (req) => {
 
   try {
     // Connect to MySQL
-    const conn = await new Client(mysqlConfig);
+    const connection = await mysql.createConnection(mysqlConfig);
     
     // Get data from MySQL
-    const [rows] = await conn.query('SELECT DISTINCT * FROM `data`');
-    await conn.end();
+    const [rows] = await connection.execute('SELECT DISTINCT * FROM `data`');
+    await connection.end();
 
     // Transform data to match Supabase schema
-    const advisors = rows.map(row => ({
+    const advisors = rows.map((row: any) => ({
       id: crypto.randomUUID(),
       first_name: row['First Name'],
       last_name: row['Last Name'],
@@ -58,6 +58,9 @@ Deno.serve(async (req) => {
 
     // Insert data into Supabase in batches
     const batchSize = 100;
+    let totalInserted = 0;
+    const startTime = Date.now();
+
     for (let i = 0; i < advisors.length; i += batchSize) {
       const batch = advisors.slice(i, i + batchSize);
       const { error } = await supabase
@@ -66,14 +69,16 @@ Deno.serve(async (req) => {
       
       if (error) throw error;
 
-      // Log progress
-      console.log(`Migrated batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(advisors.length / batchSize)}`);
+      totalInserted += batch.length;
+      console.log(`Migrated ${totalInserted} of ${advisors.length} advisors`);
     }
+
+    const duration = (Date.now() - startTime) / 1000;
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Successfully migrated ${advisors.length} advisors` 
+        message: `Successfully migrated ${totalInserted} advisors in ${duration.toFixed(2)} seconds` 
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -84,7 +89,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Migration error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "An unknown error occurred" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
