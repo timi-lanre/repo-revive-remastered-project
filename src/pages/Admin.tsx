@@ -37,26 +37,44 @@ const Admin = () => {
       const pendingUsers = await authService.getPendingUsers();
       setUsers(pendingUsers);
       
-      // Load all users directly from the database
-      const { data: profiles, error } = await supabase
+      // Load all users from auth and profiles
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) {
+        console.error("Error loading auth users:", authError);
+        throw authError;
+      }
+      
+      // Load all profile data
+      const { data: profiles, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
         .order('created_at', { ascending: false });
         
-      if (error) throw error;
+      if (profileError) throw profileError;
       
-      // Transform the profiles into the required format
-      const usersWithEmail = profiles.map(profile => ({
-        id: profile.user_id,
-        email: profile.email || '',
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        status: profile.status,
-        role: profile.role,
-        createdAt: profile.created_at
-      }));
+      // Create a map of user IDs to profiles for quick lookup
+      const profileMap = new Map();
+      profiles.forEach(profile => {
+        profileMap.set(profile.user_id, profile);
+      });
       
-      setAllUsers(usersWithEmail);
+      // Combine auth users with profiles
+      const usersWithProfile = authUsers.users.map(authUser => {
+        const profile = profileMap.get(authUser.id) || {};
+        
+        return {
+          id: authUser.id,
+          email: authUser.email || '',
+          firstName: profile.first_name || authUser.user_metadata?.first_name || '',
+          lastName: profile.last_name || authUser.user_metadata?.last_name || '',
+          status: profile.status || 'UNKNOWN',
+          role: profile.role || 'user',
+          createdAt: profile.created_at || authUser.created_at
+        };
+      });
+      
+      setAllUsers(usersWithProfile);
     } catch (error: any) {
       console.error("Error loading users:", error);
       setLoadingError(error.message || "Failed to load users");

@@ -1,3 +1,4 @@
+
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 
@@ -28,6 +29,7 @@ const generateRandomPassword = (length = 12) => {
 
 const sendEmail = async (type: 'approval' | 'rejection' | 'account_created', email: string, firstName: string, password?: string) => {
   try {
+    console.log('Sending email:', { type, email, firstName });
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
       method: 'POST',
       headers: {
@@ -44,8 +46,11 @@ const sendEmail = async (type: 'approval' | 'rejection' | 'account_created', ema
     });
 
     if (!response.ok) {
+      console.error('Email API response:', await response.text());
       throw new Error('Failed to send email notification');
     }
+    
+    console.log('Email sent successfully');
   } catch (error) {
     console.error('Error sending email:', error);
   }
@@ -58,11 +63,16 @@ export const createUser = async (
 ): Promise<{ success: boolean }> => {
   try {
     // Check if user already exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: checkError } = await supabase
       .from('user_profiles')
       .select('user_id')
       .eq('email', email)
       .maybeSingle();
+      
+    if (checkError) {
+      console.error('Error checking existing user:', checkError);
+      throw new Error(`Database error: ${checkError.message}`);
+    }
 
     if (existingUser) {
       throw new Error("A user with this email already exists");
@@ -70,39 +80,32 @@ export const createUser = async (
 
     // Generate a random password
     const password = generateRandomPassword();
-
-    // Create the user in Supabase Auth
-    const { data: { user }, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-      }
+    
+    // Create user via the Edge Function instead of client-side admin API
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/create-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        firstName,
+        lastName
+      }),
     });
-
-    if (authError) throw authError;
-    if (!user) throw new Error("Failed to create user");
-
-    // Create user profile
-    const { error: profileError } = await supabase
-      .from('user_profiles')
-      .insert([
-        {
-          user_id: user.id,
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          status: "APPROVED", // Auto-approve admin-created users
-          role: "user"
-        }
-      ]);
-
-    if (profileError) {
-      // Clean up by deleting the auth user if profile creation fails
-      await supabase.auth.admin.deleteUser(user.id);
-      throw profileError;
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response from create-user function:', errorText);
+      throw new Error(`Failed to create user: ${errorText}`);
+    }
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create user');
     }
 
     // Send welcome email with login details

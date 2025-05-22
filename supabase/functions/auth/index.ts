@@ -121,20 +121,28 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const path = url.pathname.replace("/auth", "");
-
-    if (path === "/signup" && req.method === "POST") {
+    
+    if (path === "/create-user" && req.method === "POST") {
       const { email, password, firstName, lastName } = await req.json();
 
+      // Check if user already exists
       const { data: existingUser } = await supabase
         .from('user_profiles')
         .select('user_id')
-        .eq('user_id', email)
+        .eq('email', email)
         .maybeSingle();
 
       if (existingUser) {
-        throw new Error("User already exists");
+        return new Response(
+          JSON.stringify({ success: false, error: "User already exists" }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
       }
 
+      // Create the user with auth API
       const { data: { user }, error: authError } = await supabase.auth.admin.createUser({
         email,
         password,
@@ -142,31 +150,66 @@ Deno.serve(async (req) => {
         user_metadata: {
           first_name: firstName,
           last_name: lastName,
-        },
+        }
       });
 
-      if (authError) throw authError;
-      if (!user) throw new Error("Failed to create user");
+      if (authError) {
+        console.error("Auth error creating user:", authError);
+        return new Response(
+          JSON.stringify({ success: false, error: authError.message }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
+      }
+      
+      if (!user) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to create user" }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
+      }
 
+      // Create user profile
       const { error: profileError } = await supabase
         .from('user_profiles')
         .insert([
           {
             user_id: user.id,
+            email: email,
             first_name: firstName,
             last_name: lastName,
-            status: "PENDING",
+            status: "APPROVED", // Auto-approve admin-created users
             role: "user"
           }
         ]);
 
       if (profileError) {
+        // Clean up by deleting the auth user if profile creation fails
         await supabase.auth.admin.deleteUser(user.id);
-        throw profileError;
+        
+        console.error("Profile error creating user:", profileError);
+        return new Response(
+          JSON.stringify({ success: false, error: profileError.message }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
       }
 
       return new Response(
-        JSON.stringify({ message: "User created successfully" }),
+        JSON.stringify({ 
+          success: true, 
+          user: { 
+            id: user.id,
+            email: user.email
+          } 
+        }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
