@@ -210,8 +210,13 @@ const Dashboard = () => {
         setSelectedTeam(value);
         break;
     }
+  };
 
+  const applyFilters = async () => {
     setPage(0);
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
     await loadAdvisors(0, searchQuery);
   };
 
@@ -295,12 +300,9 @@ const Dashboard = () => {
     setSelectedTeam("all");
     setSelectedFavoritesList("all");
     setSelectedReportList("all");
-    
     setSearchQuery("");
-    
     setSortColumn("firstName");
     setSortDirection("asc");
-    
     setPage(0);
     
     if (tableContainerRef.current) {
@@ -308,7 +310,6 @@ const Dashboard = () => {
     }
     
     await loadAdvisors(0, "");
-    
     await loadFilterOptions();
   };
 
@@ -387,7 +388,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="max-w-[95%] mx-auto px-4 py-8">
+      <div className="w-full max-w-[1800px] mx-auto px-4 py-8">
         {latestNews && (
           <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
             <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
@@ -503,7 +504,10 @@ const Dashboard = () => {
             <Button variant="outline" onClick={resetFilters}>
               Reset Filters
             </Button>
-            <Button className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
+            <Button 
+              className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+              onClick={applyFilters}
+            >
               Apply Filters
             </Button>
           </div>
@@ -521,28 +525,28 @@ const Dashboard = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div style={{ height: 'calc(13 * 53px + 48px)' }} className="overflow-auto">
-            <table className="w-full border-collapse">
+          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(13 * 53px + 48px)' }}>
+            <table className="w-full table-fixed border-collapse min-w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   {[
-                    { key: 'firstName', label: 'First Name' },
-                    { key: 'lastName', label: 'Last Name' },
-                    { key: 'teamName', label: 'Team Name' },
-                    { key: 'title', label: 'Title' },
-                    { key: 'firm', label: 'Firm' },
-                    { key: 'branch', label: 'Branch' },
-                    { key: 'city', label: 'City' },
-                    { key: 'province', label: 'Province' },
-                    { key: 'actions', label: 'Actions', width: '200px' }
+                    { key: 'firstName', label: 'First Name', width: '120px' },
+                    { key: 'lastName', label: 'Last Name', width: '120px' },
+                    { key: 'teamName', label: 'Team Name', width: '180px' },
+                    { key: 'title', label: 'Title', width: '180px' },
+                    { key: 'firm', label: 'Firm', width: '140px' },
+                    { key: 'branch', label: 'Branch', width: '180px' },
+                    { key: 'city', label: 'City', width: '120px' },
+                    { key: 'province', label: 'Province', width: '100px' },
+                    { key: 'actions', label: 'Actions', width: '160px' }
                   ].map((column) => (
                     <th
                       key={column.key}
                       onClick={() => column.key !== 'actions' && handleSort(column.key)}
-                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
+                      className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 ${
                         column.key !== 'actions' ? 'cursor-pointer hover:bg-gray-100' : ''
-                      } ${column.key === 'actions' ? 'text-right sticky right-0 bg-gray-50' : ''}`}
-                      style={column.width ? { width: column.width } : undefined}
+                      } ${column.key === 'actions' ? 'text-center sticky right-0 bg-gray-50' : ''}`}
+                      style={{ width: column.width }}
                     >
                       <div className="flex items-center gap-1">
                         {column.label}
@@ -561,32 +565,32 @@ const Dashboard = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
                   <tr key={advisor.id} className="hover:bg-gray-50" style={{ height: '53px' }}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.firstName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.lastName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.teamName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.title}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.firm}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.branch}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.city}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
                       {advisor.province}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right sticky right-0 bg-white">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
