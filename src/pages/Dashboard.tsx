@@ -60,12 +60,12 @@ const Dashboard = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isLoadingFilters, setIsLoadingFilters] = useState(false);
 
-  // Update state to handle multiple selections
-  const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
-  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  // Update state to handle single selections
+  const [selectedProvince, setSelectedProvince] = useState<string>("");
+  const [selectedCity, setSelectedCity] = useState<string>("");
+  const [selectedFirm, setSelectedFirm] = useState<string>("");
+  const [selectedBranch, setSelectedBranch] = useState<string>("");
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [selectedFavoritesList, setSelectedFavoritesList] = useState<string>("all");
   const [selectedReportList, setSelectedReportList] = useState<string>("all");
 
@@ -93,21 +93,21 @@ const Dashboard = () => {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
 
-      // Apply multiple filters
-      if (selectedProvinces.length > 0) {
-        query = query.in('province', selectedProvinces);
+      // Apply single filters
+      if (selectedProvince) {
+        query = query.eq('province', selectedProvince);
       }
-      if (selectedCities.length > 0) {
-        query = query.in('city', selectedCities);
+      if (selectedCity) {
+        query = query.eq('city', selectedCity);
       }
-      if (selectedFirms.length > 0) {
-        query = query.in('firm', selectedFirms);
+      if (selectedFirm) {
+        query = query.eq('firm', selectedFirm);
       }
-      if (selectedBranches.length > 0) {
-        query = query.in('branch', selectedBranches);
+      if (selectedBranch) {
+        query = query.eq('branch', selectedBranch);
       }
-      if (selectedTeams.length > 0) {
-        query = query.in('team_name', selectedTeams);
+      if (selectedTeam) {
+        query = query.eq('team_name', selectedTeam);
       }
 
       const columnMap: Record<string, string> = {
@@ -163,17 +163,17 @@ const Dashboard = () => {
       let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
       // Apply cascading filters
-      if (selectedProvinces.length > 0) {
-        query = query.in('province', selectedProvinces);
+      if (selectedProvince) {
+        query = query.eq('province', selectedProvince);
       }
-      if (selectedCities.length > 0) {
-        query = query.in('city', selectedCities);
+      if (selectedCity) {
+        query = query.eq('city', selectedCity);
       }
-      if (selectedFirms.length > 0) {
-        query = query.in('firm', selectedFirms);
+      if (selectedFirm) {
+        query = query.eq('firm', selectedFirm);
       }
-      if (selectedBranches.length > 0) {
-        query = query.in('branch', selectedBranches);
+      if (selectedBranch) {
+        query = query.eq('branch', selectedBranch);
       }
 
       const { data, error } = await query;
@@ -203,34 +203,34 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadFilterOptions();
-  }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches]);
+  }, [selectedProvince, selectedCity, selectedFirm, selectedBranch]);
 
-  const handleFilterChange = async (value: string[], filterType: string) => {
+  const handleFilterChange = async (value: string, filterType: string) => {
     switch (filterType) {
       case 'province':
-        setSelectedProvinces(value);
-        setSelectedCities([]);
-        setSelectedFirms([]);
-        setSelectedBranches([]);
-        setSelectedTeams([]);
+        setSelectedProvince(value);
+        setSelectedCity("");
+        setSelectedFirm("");
+        setSelectedBranch("");
+        setSelectedTeam("");
         break;
       case 'city':
-        setSelectedCities(value);
-        setSelectedFirms([]);
-        setSelectedBranches([]);
-        setSelectedTeams([]);
+        setSelectedCity(value);
+        setSelectedFirm("");
+        setSelectedBranch("");
+        setSelectedTeam("");
         break;
       case 'firm':
-        setSelectedFirms(value);
-        setSelectedBranches([]);
-        setSelectedTeams([]);
+        setSelectedFirm(value);
+        setSelectedBranch("");
+        setSelectedTeam("");
         break;
       case 'branch':
-        setSelectedBranches(value);
-        setSelectedTeams([]);
+        setSelectedBranch(value);
+        setSelectedTeam("");
         break;
       case 'team':
-        setSelectedTeams(value);
+        setSelectedTeam(value);
         break;
     }
 
@@ -238,22 +238,32 @@ const Dashboard = () => {
     await loadAdvisors(0, searchQuery);
   };
 
-  const removeFilter = async (type: string, value: string) => {
+  const removeFilter = async (type: string) => {
     switch (type) {
       case 'province':
-        setSelectedProvinces(prev => prev.filter(p => p !== value));
+        setSelectedProvince("");
+        setSelectedCity("");
+        setSelectedFirm("");
+        setSelectedBranch("");
+        setSelectedTeam("");
         break;
       case 'city':
-        setSelectedCities(prev => prev.filter(c => c !== value));
+        setSelectedCity("");
+        setSelectedFirm("");
+        setSelectedBranch("");
+        setSelectedTeam("");
         break;
       case 'firm':
-        setSelectedFirms(prev => prev.filter(f => f !== value));
+        setSelectedFirm("");
+        setSelectedBranch("");
+        setSelectedTeam("");
         break;
       case 'branch':
-        setSelectedBranches(prev => prev.filter(b => b !== value));
+        setSelectedBranch("");
+        setSelectedTeam("");
         break;
       case 'team':
-        setSelectedTeams(prev => prev.filter(t => t !== value));
+        setSelectedTeam("");
         break;
     }
     
@@ -266,7 +276,7 @@ const Dashboard = () => {
       setPage(0);
       loadAdvisors(0, term);
     }, 300),
-    [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams]
+    [selectedProvince, selectedCity, selectedFirm, selectedBranch, selectedTeam]
   );
 
   useEffect(() => {
@@ -334,11 +344,11 @@ const Dashboard = () => {
   };
 
   const resetFilters = async () => {
-    setSelectedProvinces([]);
-    setSelectedCities([]);
-    setSelectedFirms([]);
-    setSelectedBranches([]);
-    setSelectedTeams([]);
+    setSelectedProvince("");
+    setSelectedCity("");
+    setSelectedFirm("");
+    setSelectedBranch("");
+    setSelectedTeam("");
     setSelectedFavoritesList("all");
     setSelectedReportList("all");
     
@@ -369,79 +379,72 @@ const Dashboard = () => {
   };
 
   const SelectedFilters = () => {
-    const hasFilters = selectedProvinces.length > 0 || selectedCities.length > 0 || 
-                      selectedFirms.length > 0 || selectedBranches.length > 0 || 
-                      selectedTeams.length > 0;
+    const hasFilters = selectedProvince || selectedCity || selectedFirm || selectedBranch || selectedTeam;
 
     if (!hasFilters) return null;
 
     return (
       <div className="flex flex-wrap gap-2 mb-4">
-        {selectedProvinces.map(province => (
+        {selectedProvince && (
           <Badge 
-            key={`province-${province}`}
             variant="secondary"
             className="flex items-center gap-1"
           >
-            Province: {province}
+            Province: {selectedProvince}
             <X 
               className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('province', province)}
+              onClick={() => removeFilter('province')}
             />
           </Badge>
-        ))}
-        {selectedCities.map(city => (
+        )}
+        {selectedCity && (
           <Badge 
-            key={`city-${city}`}
             variant="secondary"
             className="flex items-center gap-1"
           >
-            City: {city}
+            City: {selectedCity}
             <X 
               className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('city', city)}
+              onClick={() => removeFilter('city')}
             />
           </Badge>
-        ))}
-        {selectedFirms.map(firm => (
+        )}
+        {selectedFirm && (
           <Badge 
-            key={`firm-${firm}`}
             variant="secondary"
             className="flex items-center gap-1"
           >
-            Firm: {firm}
+            Firm: {selectedFirm}
             <X 
               className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('firm', firm)}
+              onClick={() => removeFilter('firm')}
             />
           </Badge>
-        ))}
-        {selectedBranches.map(branch => (
+        )}
+        {selectedBranch && (
           <Badge 
-            key={`branch-${branch}`}
             variant="secondary"
             className="flex items-center gap-1"
           >
-            Branch: {branch}
+            Branch: {selectedBranch}
             <X 
               className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('branch', branch)}
+              onClick={() => removeFilter('branch')}
             />
           </Badge>
-        ))}
-        {selectedTeams.map(team => (
+        )}
+        {selectedTeam && (
           <Badge 
-            key={`team-${team}`}
             variant="secondary"
             className="flex items-center gap-1"
           >
-            Team: {team}
+            Team: {selectedTeam}
             <X 
               className="h-3 w-3 cursor-pointer" 
-              onClick={() => removeFilter('team', team)}
+              onClick={() => removeFilter('team')}
             />
           </Badge>
-        ))}
+        )}
       </div>
     );
   };
@@ -526,9 +529,8 @@ const Dashboard = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <Select 
-              value={selectedProvinces} 
+              value={selectedProvince} 
               onValueChange={(value) => handleFilterChange(value, 'province')}
-              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Provinces" />
@@ -543,9 +545,8 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedCities} 
+              value={selectedCity} 
               onValueChange={(value) => handleFilterChange(value, 'city')}
-              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Cities" />
@@ -560,9 +561,8 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedFirms} 
+              value={selectedFirm} 
               onValueChange={(value) => handleFilterChange(value, 'firm')}
-              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Firms" />
@@ -577,9 +577,8 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedBranches} 
+              value={selectedBranch} 
               onValueChange={(value) => handleFilterChange(value, 'branch')}
-              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Branches" />
@@ -594,9 +593,8 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedTeams} 
+              value={selectedTeam} 
               onValueChange={(value) => handleFilterChange(value, 'team')}
-              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Teams" />
