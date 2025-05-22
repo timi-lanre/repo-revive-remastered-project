@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
@@ -5,10 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle, X, ChevronDown } from "lucide-react";
+import { 
+  Info, 
+  Search, 
+  ChevronUp, 
+  Heart, 
+  Mail, 
+  Globe, 
+  Linkedin, 
+  AlertTriangle, 
+  X, 
+  ChevronDown,
+  Filter 
+} from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
+import { 
+  ToggleGroup, 
+  ToggleGroupItem 
+} from "@/components/ui/toggle-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Advisor {
   id: string;
@@ -54,15 +72,24 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
     onChange(newValue);
   };
 
-  const handleRemove = (option: string) => {
+  const handleRemove = (option: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     onChange(value.filter(v => v !== option));
   };
 
-  const handleClear = () => {
+  const handleClear = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     onChange([]);
   };
 
-  const handleSelectAll = () => {
+  const handleSelectAll = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     onChange([...options]);
   };
 
@@ -131,7 +158,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                     className="hover:text-blue-600 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleSelectAll();
+                      handleSelectAll(e);
                     }}
                   >
                     Select All
@@ -140,30 +167,107 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                     className="hover:text-red-600 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleClear();
+                      handleClear(e);
                     }}
                   >
                     Clear All
                   </button>
                 </div>
               </div>
-              {options.map((option) => (
-                <div
-                  key={option}
-                  className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
-                  onClick={() => handleToggle(option)}
-                >
-                  <Checkbox
-                    checked={value.includes(option)}
-                    onChange={() => handleToggle(option)}
-                  />
-                  <span className="text-sm">{option}</span>
-                </div>
-              ))}
+              <ScrollArea className="max-h-52">
+                {options.map((option) => (
+                  <div
+                    key={option}
+                    className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggle(option);
+                    }}
+                  >
+                    <Checkbox
+                      checked={value.includes(option)}
+                      onCheckedChange={() => handleToggle(option)}
+                    />
+                    <span className="text-sm">{option}</span>
+                  </div>
+                ))}
+              </ScrollArea>
             </>
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+// ActiveFilters component to display and manage active filters
+const ActiveFilters = ({ 
+  activeProvinces, 
+  activeCities, 
+  activeFirms, 
+  activeBranches, 
+  activeTeams,
+  onRemoveFilter
+}) => {
+  const hasFilters = activeProvinces.length > 0 || activeCities.length > 0 || 
+                     activeFirms.length > 0 || activeBranches.length > 0 || 
+                     activeTeams.length > 0;
+                     
+  if (!hasFilters) {
+    return <div className="text-gray-500 italic text-sm">No active filters</div>;
+  }
+  
+  return (
+    <div className="flex flex-wrap gap-2">
+      {activeProvinces.map(province => (
+        <Badge key={`province-${province}`} variant="secondary" className="px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+          Province: {province}
+          <X 
+            className="h-3 w-3 cursor-pointer hover:text-red-500"
+            onClick={() => onRemoveFilter('province', province)} 
+          />
+        </Badge>
+      ))}
+      
+      {activeCities.map(city => (
+        <Badge key={`city-${city}`} variant="secondary" className="px-2 py-1 bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1">
+          City: {city}
+          <X 
+            className="h-3 w-3 cursor-pointer hover:text-red-500" 
+            onClick={() => onRemoveFilter('city', city)} 
+          />
+        </Badge>
+      ))}
+      
+      {activeFirms.map(firm => (
+        <Badge key={`firm-${firm}`} variant="secondary" className="px-2 py-1 bg-green-50 text-green-800 border border-green-200 flex items-center gap-1">
+          Firm: {firm}
+          <X 
+            className="h-3 w-3 cursor-pointer hover:text-red-500" 
+            onClick={() => onRemoveFilter('firm', firm)} 
+          />
+        </Badge>
+      ))}
+      
+      {activeBranches.map(branch => (
+        <Badge key={`branch-${branch}`} variant="secondary" className="px-2 py-1 bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1">
+          Branch: {branch}
+          <X 
+            className="h-3 w-3 cursor-pointer hover:text-red-500" 
+            onClick={() => onRemoveFilter('branch', branch)} 
+          />
+        </Badge>
+      ))}
+      
+      {activeTeams.map(team => (
+        <Badge key={`team-${team}`} variant="secondary" className="px-2 py-1 bg-red-50 text-red-800 border border-red-200 flex items-center gap-1">
+          Team: {team}
+          <X 
+            className="h-3 w-3 cursor-pointer hover:text-red-500" 
+            onClick={() => onRemoveFilter('team', team)} 
+          />
+        </Badge>
+      ))}
     </div>
   );
 };
@@ -182,6 +286,9 @@ const Dashboard = () => {
   const [page, setPage] = useState(0);
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  
+  // Toggle for expanded filter view
+  const [showFilters, setShowFilters] = useState(true);
 
   // Active filters (applied to data)
   const [activeProvinces, setActiveProvinces] = useState<string[]>([]);
@@ -365,8 +472,7 @@ const Dashboard = () => {
 
       const dbColumn = columnMap[sortColumn] || 'first_name';
       query = query.order(dbColumn, { 
-        ascending: sortDirection === 'asc', 
-        nullsFirst: sortDirection === 'desc' 
+        ascending: sortDirection === 'asc'
       });
 
       const { data, count, error } = await query
@@ -577,8 +683,7 @@ const Dashboard = () => {
 
       const dbColumn = columnMap[newSortColumn] || 'first_name';
       query = query.order(dbColumn, { 
-        ascending: newSortDirection === 'asc', 
-        nullsFirst: newSortDirection === 'desc' 
+        ascending: newSortDirection === 'asc'
       });
 
       const { data, count, error } = await query
@@ -664,8 +769,7 @@ const Dashboard = () => {
 
       const dbColumn = columnMap[sortColumn] || 'first_name';
       query = query.order(dbColumn, { 
-        ascending: sortDirection === 'asc', 
-        nullsFirst: sortDirection === 'desc' 
+        ascending: sortDirection === 'asc'
       });
 
       const { data, count, error } = await query
@@ -706,6 +810,60 @@ const Dashboard = () => {
   const hasUnappliedChanges = () => {
     return JSON.stringify([activeProvinces, activeCities, activeFirms, activeBranches, activeTeams]) !==
            JSON.stringify([selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams]);
+  };
+
+  // Handle filter removal directly from displayed badges
+  const handleRemoveFilter = (filterType: string, value: string) => {
+    switch(filterType) {
+      case 'province':
+        setActiveProvinces(prev => prev.filter(p => p !== value));
+        setSelectedProvinces(prev => prev.filter(p => p !== value));
+        break;
+      case 'city':
+        setActiveCities(prev => prev.filter(c => c !== value));
+        setSelectedCities(prev => prev.filter(c => c !== value));
+        break;
+      case 'firm':
+        setActiveFirms(prev => prev.filter(f => f !== value));
+        setSelectedFirms(prev => prev.filter(f => f !== value));
+        break;
+      case 'branch':
+        setActiveBranches(prev => prev.filter(b => b !== value));
+        setSelectedBranches(prev => prev.filter(b => b !== value));
+        break;
+      case 'team':
+        setActiveTeams(prev => prev.filter(t => t !== value));
+        setSelectedTeams(prev => prev.filter(t => t !== value));
+        break;
+    }
+    
+    // Reload data with the updated filters
+    setPage(0);
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTop = 0;
+    }
+    
+    setTimeout(() => {
+      let updatedProvinces = [...activeProvinces];
+      let updatedCities = [...activeCities];
+      let updatedFirms = [...activeFirms];
+      let updatedBranches = [...activeBranches];
+      let updatedTeams = [...activeTeams];
+      
+      if (filterType === 'province') updatedProvinces = updatedProvinces.filter(p => p !== value);
+      if (filterType === 'city') updatedCities = updatedCities.filter(c => c !== value);
+      if (filterType === 'firm') updatedFirms = updatedFirms.filter(f => f !== value);
+      if (filterType === 'branch') updatedBranches = updatedBranches.filter(b => b !== value);
+      if (filterType === 'team') updatedTeams = updatedTeams.filter(t => t !== value);
+      
+      loadAdvisorsWithNewFilters(
+        updatedProvinces,
+        updatedCities,
+        updatedFirms,
+        updatedBranches,
+        updatedTeams
+      );
+    }, 0);
   };
 
   if (isLoading) {
@@ -781,15 +939,25 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Compact Filters Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+        {/* Enhanced Filter Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Search className="h-5 w-5 text-gray-400" />
-              Filters
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Filter className="h-5 w-5 text-gray-400" />
+                Filter Advisors
+              </h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="ml-2 h-7 px-2"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                {showFilters ? 'Hide Filters' : 'Show Filters'}
+              </Button>
+            </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
-              Active: {getActiveFilterCount()}
+              <span>Active Filters: {getActiveFilterCount()}</span>
               {hasUnappliedChanges() && (
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                   Changes Pending
@@ -798,88 +966,130 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Provinces</label>
-              <MultiSelect
-                value={selectedProvinces}
-                onChange={setSelectedProvinces}
-                options={filterOptions.provinces}
-                placeholder="Select provinces..."
-              />
+          {/* Selected filters display - Always visible */}
+          <div className="mb-4 p-3 border border-gray-200 bg-gray-50 rounded-lg min-h-12">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-700">Active Filters</h3>
+              {getActiveFilterCount() > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 px-2 text-xs text-red-600 hover:text-red-800 hover:bg-red-50"
+                  onClick={resetFilters}
+                >
+                  Clear All
+                </Button>
+              )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cities</label>
-              <MultiSelect
-                value={selectedCities}
-                onChange={setSelectedCities}
-                options={filterOptions.cities}
-                placeholder="Select cities..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Firms</label>
-              <MultiSelect
-                value={selectedFirms}
-                onChange={setSelectedFirms}
-                options={filterOptions.firms}
-                placeholder="Select firms..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Branches</label>
-              <MultiSelect
-                value={selectedBranches}
-                onChange={setSelectedBranches}
-                options={filterOptions.branches}
-                placeholder="Select branches..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Teams</label>
-              <MultiSelect
-                value={selectedTeams}
-                onChange={setSelectedTeams}
-                options={filterOptions.teams}
-                placeholder="Select teams..."
-              />
-            </div>
+            <ActiveFilters
+              activeProvinces={activeProvinces}
+              activeCities={activeCities}
+              activeFirms={activeFirms}
+              activeBranches={activeBranches}
+              activeTeams={activeTeams}
+              onRemoveFilter={handleRemoveFilter}
+            />
           </div>
 
-          <div className="flex justify-between items-center">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search by name..."
-                value={searchQuery}
-                onChange={handleSearch}
-                className="pl-10"
-              />
+          {/* Filter controls - Can be hidden */}
+          {showFilters && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Provinces</label>
+                  <MultiSelect
+                    value={selectedProvinces}
+                    onChange={setSelectedProvinces}
+                    options={filterOptions.provinces}
+                    placeholder="Select provinces..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cities</label>
+                  <MultiSelect
+                    value={selectedCities}
+                    onChange={setSelectedCities}
+                    options={filterOptions.cities}
+                    placeholder="Select cities..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Firms</label>
+                  <MultiSelect
+                    value={selectedFirms}
+                    onChange={setSelectedFirms}
+                    options={filterOptions.firms}
+                    placeholder="Select firms..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Branches</label>
+                  <MultiSelect
+                    value={selectedBranches}
+                    onChange={setSelectedBranches}
+                    options={filterOptions.branches}
+                    placeholder="Select branches..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teams</label>
+                  <MultiSelect
+                    value={selectedTeams}
+                    onChange={setSelectedTeams}
+                    options={filterOptions.teams}
+                    placeholder="Select teams..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search by name..."
+                    value={searchQuery}
+                    onChange={handleSearch}
+                    className="pl-10"
+                  />
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={resetFilters}
+                  >
+                    Reset All
+                  </Button>
+                  <Button 
+                    className={`${hasUnappliedChanges() ? 'bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]' : 'bg-gray-300 text-gray-600'}`}
+                    onClick={applyFilters}
+                    disabled={loadingAdvisors || !hasUnappliedChanges()}
+                  >
+                    {loadingAdvisors ? 'Loading...' : 'Apply Filters'}
+                  </Button>
+                </div>
+              </div>
             </div>
-            
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={resetFilters}>
-                Reset All
-              </Button>
-              <Button 
-                className={`${hasUnappliedChanges() ? 'bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]' : 'bg-gray-300 text-gray-600'}`}
-                onClick={applyFilters}
-                disabled={loadingAdvisors || !hasUnappliedChanges()}
-              >
-                {loadingAdvisors ? 'Loading...' : 'Apply Filters'}
-              </Button>
-            </div>
-          </div>
+          )}
+        </div>
+
+        {/* View Mode Selection */}
+        <div className="mb-4">
+          <ToggleGroup type="single" defaultValue="table" className="justify-start">
+            <ToggleGroupItem value="table" className="text-xs">Table View</ToggleGroupItem>
+            <ToggleGroupItem value="card" className="text-xs">Card View</ToggleGroupItem>
+            <ToggleGroupItem value="map" className="text-xs">Map View</ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         {/* Results Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(15 * 65px + 48px)' }}>
+          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(15 * 70px + 48px)' }}>
             <table className="w-full table-fixed border-collapse min-w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -918,29 +1128,29 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
-                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ minHeight: '65px' }}>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ height: '70px' }}>
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.firstName}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.lastName}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.teamName}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.title}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.firm}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.branch}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.city}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate whitespace-normal">
                       {advisor.province}
                     </td>
                     <td className="px-3 py-4 text-sm text-gray-500 text-center">

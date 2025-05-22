@@ -1,43 +1,65 @@
 
-import { cognitoConfig } from '@/config/cognito';
-import * as oidcClient from 'openid-client';
+import { Client } from 'openid-client';
+import { Issuer } from 'openid-client';
+import { generators } from 'openid-client';
+import { cognitoConfig } from "@/config/cognito";
 
-// We'll store the OpenID client here
-let client: any = null;
+// Initialize OIDC client
+let client: Client | null = null;
 
-// Initialize the OpenID client
-export async function initializeOidcClient(): Promise<any> {
+export const initializeOidcClient = async () => {
+  if (client) return client;
+
   try {
-    const issuer = await oidcClient.Issuer.discover(`https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}`);
-    
-    // Create client with correct props
-    client = new issuer.Client({
-      client_id: cognitoConfig.userPoolWebClientId,
-      redirect_uris: [window.location.origin + '/callback'],
+    // Discover the OIDC provider
+    const cognitoIssuer = await Issuer.discover(
+      `https://cognito-idp.${cognitoConfig.region}.amazonaws.com/${cognitoConfig.userPoolId}/.well-known/openid-configuration`
+    );
+
+    // Create an OIDC client
+    client = new cognitoIssuer.Client({
+      client_id: cognitoConfig.clientId,
+      redirect_uris: [window.location.origin + '/auth/callback'],
       response_types: ['code'],
     });
-    
-    console.log('OIDC client initialized successfully');
+
     return client;
   } catch (error) {
-    console.error('Failed to initialize OIDC client:', error);
-    throw error; // Propagate error for better debugging
+    console.error('Error initializing OIDC client:', error);
+    throw error;
   }
-}
+};
 
-// Get or initialize OIDC client
-export async function getOidcClient(): Promise<any> {
-  if (!client) {
-    await initializeOidcClient();
-  }
-  return client;
-}
-
-// Generate nonce and state for authentication
-export function generateAuthParams() {
-  const { generators } = oidcClient;
-  const state = generators.state();
+export const getAuthorizationUrl = async () => {
+  const oidcClient = await initializeOidcClient();
   const nonce = generators.nonce();
+  const state = generators.state();
   
-  return { state, nonce };
-}
+  const url = oidcClient.authorizationUrl({
+    scope: 'openid email profile',
+    nonce,
+    state,
+  });
+
+  // Store state for verification later
+  sessionStorage.setItem('auth_state', state);
+  
+  return url;
+};
+
+export const handleCallback = async (callbackUrl: string) => {
+  const oidcClient = await initializeOidcClient();
+  const params = oidcClient.callbackParams(callbackUrl);
+  
+  const storedState = sessionStorage.getItem('auth_state');
+  
+  const tokenSet = await oidcClient.callback(
+    window.location.origin + '/auth/callback',
+    params,
+    { state: storedState || undefined }
+  );
+  
+  sessionStorage.removeItem('auth_state');
+  
+  return tokenSet;
+};
