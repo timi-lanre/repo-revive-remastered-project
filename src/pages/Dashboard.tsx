@@ -43,22 +43,9 @@ interface MultiSelectProps {
 
 const ITEMS_PER_PAGE = 50;
 
+// Multi-select dropdown component
 const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, placeholder, disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const handleToggle = (option: string) => {
     const newValue = value.includes(option)
@@ -67,97 +54,113 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
     onChange(newValue);
   };
 
-  const handleSelectAll = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange([...options]);
+  const handleRemove = (option: string) => {
+    onChange(value.filter(v => v !== option));
   };
 
-  const handleClearAll = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClear = () => {
     onChange([]);
   };
 
-  const handleRemoveTag = (optionToRemove: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange(value.filter(v => v !== optionToRemove));
+  const handleSelectAll = () => {
+    onChange([...options]);
   };
 
+  const allSelected = options.length > 0 && value.length === options.length;
+  const noneSelected = value.length === 0;
+
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <div
         className={`flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background 
           ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} 
           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
-        <div className="flex flex-wrap gap-1 flex-1 min-h-[24px]">
+        <div className="flex flex-wrap gap-1 flex-1">
           {value.length === 0 ? (
             <span className="text-muted-foreground">{placeholder}</span>
-          ) : value.length === options.length ? (
+          ) : allSelected ? (
             <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
               All Selected ({options.length})
             </Badge>
           ) : (
-            <>
-              {value.slice(0, 2).map((item) => (
-                <Badge 
-                  key={item} 
-                  variant="secondary" 
-                  className="text-xs flex items-center gap-1 bg-[#E5D3BC]/20 text-[#1E293B]"
-                >
-                  {item}
-                  <X
-                    className="h-3 w-3 cursor-pointer hover:text-red-500"
-                    onClick={(e) => handleRemoveTag(item, e)}
-                  />
-                </Badge>
-              ))}
-              {value.length > 2 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{value.length - 2} more
-                </Badge>
-              )}
-            </>
+            value.slice(0, 2).map((item) => (
+              <Badge key={item} variant="secondary" className="text-xs">
+                {item}
+                <X
+                  className="ml-1 h-3 w-3 cursor-pointer hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove(item);
+                  }}
+                />
+              </Badge>
+            ))
+          )}
+          {value.length > 2 && !allSelected && (
+            <Badge variant="secondary" className="text-xs">
+              +{value.length - 2} more
+            </Badge>
           )}
         </div>
-        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <div className="flex items-center gap-2">
+          {value.length > 0 && (
+            <X
+              className="h-4 w-4 cursor-pointer hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClear();
+              }}
+            />
+          )}
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
       </div>
 
       {isOpen && !disabled && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover p-1 shadow-md">
-          <div className="sticky top-0 bg-white border-b pb-1 mb-1">
-            <div className="flex items-center justify-between px-2 py-1">
-              <button
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                onClick={handleSelectAll}
-              >
-                Select All
-              </button>
-              <button
-                className="text-xs text-red-600 hover:text-red-800 font-medium"
-                onClick={handleClearAll}
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
-          
           {options.length === 0 ? (
             <div className="py-2 px-3 text-sm text-muted-foreground">No options available</div>
           ) : (
-            options.map((option) => (
-              <div
-                key={option}
-                className="flex items-center space-x-2 rounded-sm px-2 py-1.5 hover:bg-accent cursor-pointer"
-                onClick={() => handleToggle(option)}
-              >
-                <Checkbox 
-                  checked={value.includes(option)}
-                  className="data-[state=checked]:bg-[#E5D3BC] data-[state=checked]:border-[#E5D3BC]"
-                />
-                <span className="text-sm">{option}</span>
+            <>
+              {/* Select All / Clear All controls */}
+              <div className="border-b border-gray-200 mb-1 pb-1">
+                <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-600">
+                  <button
+                    className="hover:text-blue-600 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectAll();
+                    }}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    className="hover:text-red-600 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClear();
+                    }}
+                  >
+                    Clear All
+                  </button>
+                </div>
               </div>
-            ))
+              {options.map((option) => (
+                <div
+                  key={option}
+                  className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
+                  onClick={() => handleToggle(option)}
+                >
+                  <Checkbox
+                    checked={value.includes(option)}
+                    onChange={() => handleToggle(option)}
+                  />
+                  <span className="text-sm">{option}</span>
+                </div>
+              ))}
+            </>
           )}
         </div>
       )}
