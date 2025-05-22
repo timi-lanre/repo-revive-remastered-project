@@ -89,6 +89,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
       ? value.filter(v => v !== option)
       : [...value, option];
     onChange(newValue);
+    // We removed the closing of dropdown here to keep it open after selection
   };
 
   const handleRemove = (option: string, e?: React.MouseEvent) => {
@@ -199,8 +200,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                     key={option}
                     className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
                     onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggle(option);
+                      e.stopPropagation(); // Prevent the dropdown from closing
+                      handleToggle(option); // Only toggle the option
                     }}
                   >
                     <Checkbox
