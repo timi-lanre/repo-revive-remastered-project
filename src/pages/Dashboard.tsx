@@ -105,9 +105,9 @@ const Dashboard = () => {
 
       const dbColumn = columnMap[sortColumn] || sortColumn;
       if (sortDirection === 'asc') {
-        query = query.order(dbColumn, { ascending: true, nullsLast: true });
+        query = query.order(dbColumn, { ascending: true });
       } else {
-        query = query.order(dbColumn, { ascending: false, nullsFirst: true });
+        query = query.order(dbColumn, { ascending: false });
       }
 
       const { data, count, error } = await query
