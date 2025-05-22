@@ -168,17 +168,23 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
 
 export const resetPassword = async (userId: string): Promise<void> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/reset-password/${userId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
+    // First get the user's email
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('email')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError || !profile?.email) {
+      throw new Error('Could not find user email');
+    }
+
+    // Send password reset email
+    const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to send password reset email');
-    }
+    if (error) throw error;
   } catch (error: any) {
     console.error("Error resetting password:", error);
     throw error;
