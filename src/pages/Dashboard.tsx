@@ -74,45 +74,6 @@ const Dashboard = () => {
     threshold: 0,
   });
 
-  // Load filter options based on current selection
-  const loadFilterOptions = async () => {
-    try {
-      let query = supabase.from('advisors').select('province, city, firm, team_name');
-
-      if (selectedProvince !== "all") {
-        query = query.eq('province', selectedProvince);
-      }
-      if (selectedCity !== "all") {
-        query = query.eq('city', selectedCity);
-      }
-      if (selectedFirm !== "all") {
-        query = query.eq('firm', selectedFirm);
-      }
-      if (selectedTeam !== "all") {
-        query = query.eq('team_name', selectedTeam);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const options: FilterOptions = {
-        provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
-        cities: Array.from(new Set(data.map(d => d.city).filter(Boolean))).sort(),
-        firms: Array.from(new Set(data.map(d => d.firm).filter(Boolean))).sort(),
-        teams: Array.from(new Set(data.map(d => d.team_name).filter(Boolean))).sort()
-      };
-
-      setFilterOptions(options);
-    } catch (error) {
-      console.error("Error loading filter options:", error);
-    }
-  };
-
-  useEffect(() => {
-    loadFilterOptions();
-  }, [selectedProvince, selectedCity, selectedFirm, selectedTeam]);
-
   const loadAdvisors = async (pageNumber: number, searchTerm: string = "") => {
     try {
       let query = supabase
@@ -130,7 +91,7 @@ const Dashboard = () => {
       if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
       if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
 
-      // Add sorting
+      // Add sorting with nulls handling
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
         lastName: 'last_name',
@@ -143,7 +104,11 @@ const Dashboard = () => {
       };
 
       const dbColumn = columnMap[sortColumn] || sortColumn;
-      query = query.order(dbColumn, { ascending: sortDirection === 'asc' });
+      if (sortDirection === 'asc') {
+        query = query.order(dbColumn, { ascending: true, nullsLast: true });
+      } else {
+        query = query.order(dbColumn, { ascending: false, nullsFirst: true });
+      }
 
       // Add pagination
       const { data, count, error } = await query
@@ -177,6 +142,72 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Error loading advisors:", error);
     }
+  };
+
+  // Load filter options based on current selection
+  const loadFilterOptions = async () => {
+    try {
+      let query = supabase.from('advisors').select('province, city, firm, team_name');
+
+      // Apply cascading filters
+      if (selectedProvince !== "all") {
+        query = query.eq('province', selectedProvince);
+      }
+      if (selectedCity !== "all") {
+        query = query.eq('city', selectedCity);
+      }
+      if (selectedFirm !== "all") {
+        query = query.eq('firm', selectedFirm);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const options: FilterOptions = {
+        provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
+        cities: Array.from(new Set(data.map(d => d.city).filter(Boolean))).sort(),
+        firms: Array.from(new Set(data.map(d => d.firm).filter(Boolean))).sort(),
+        teams: Array.from(new Set(data.map(d => d.team_name).filter(Boolean))).sort()
+      };
+
+      setFilterOptions(options);
+    } catch (error) {
+      console.error("Error loading filter options:", error);
+    }
+  };
+
+  // Update filter options when selections change
+  useEffect(() => {
+    loadFilterOptions();
+  }, [selectedProvince, selectedCity, selectedFirm]);
+
+  const handleFilterChange = async (value: string, filterType: string) => {
+    // Reset dependent filters
+    switch (filterType) {
+      case 'province':
+        setSelectedProvince(value);
+        setSelectedCity('all');
+        setSelectedFirm('all');
+        setSelectedTeam('all');
+        break;
+      case 'city':
+        setSelectedCity(value);
+        setSelectedFirm('all');
+        setSelectedTeam('all');
+        break;
+      case 'firm':
+        setSelectedFirm(value);
+        setSelectedTeam('all');
+        break;
+      case 'team':
+        setSelectedTeam(value);
+        break;
+    }
+
+    // Reset pagination and reload data
+    setPage(0);
+    await loadAdvisors(0, searchQuery);
   };
 
   // Debounced search function
@@ -266,7 +297,7 @@ const Dashboard = () => {
   };
 
   const handleSort = (column: string) => {
-    if (column === 'actions') return; // Skip sorting for actions column
+    if (column === 'actions') return;
     
     if (sortColumn === column) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -276,30 +307,6 @@ const Dashboard = () => {
     }
     setPage(0);
     loadAdvisors(0, searchQuery);
-  };
-
-  const handleFilterChange = async (value: string, filterType: string) => {
-    // Reset dependent filters
-    switch (filterType) {
-      case 'province':
-        setSelectedProvince(value);
-        setSelectedCity('all');
-        break;
-      case 'city':
-        setSelectedCity(value);
-        break;
-      case 'firm':
-        setSelectedFirm(value);
-        setSelectedTeam('all');
-        break;
-      case 'team':
-        setSelectedTeam(value);
-        break;
-    }
-
-    // Reset pagination and reload data
-    setPage(0);
-    await loadAdvisors(0, searchQuery);
   };
 
   if (isLoading) {
@@ -498,127 +505,125 @@ const Dashboard = () => {
         {/* Advisors Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="relative">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {[
-                      { key: 'firstName', label: 'First Name' },
-                      { key: 'lastName', label: 'Last Name' },
-                      { key: 'teamName', label: 'Team Name' },
-                      { key: 'title', label: 'Title' },
-                      { key: 'firm', label: 'Firm' },
-                      { key: 'branch', label: 'Branch' },
-                      { key: 'city', label: 'City' },
-                      { key: 'province', label: 'Province' },
-                      { key: 'actions', label: 'Actions' }
-                    ].map((column) => (
-                      <th
-                        key={column.key}
-                        onClick={() => handleSort(column.key)}
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                          column.key !== 'actions' ? 'cursor-pointer hover:bg-gray-100' : ''
-                        } ${column.key === 'actions' ? 'text-right' : ''}`}
-                      >
-                        <div className="flex items-center gap-1">
-                          {column.label}
-                          {column.key !== 'actions' && sortColumn === column.key && (
-                            <ChevronUp
-                              className={`h-4 w-4 transition-transform ${
-                                sortDirection === 'desc' ? 'rotate-180' : ''
-                              }`}
-                            />
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {advisors.map((advisor) => (
-                    <tr key={advisor.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.firstName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.lastName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.teamName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.title}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.firm}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.branch}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.city}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {advisor.province}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        <div className="flex items-center justify-end gap-2">
+            <table className="w-full border-collapse">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  {[
+                    { key: 'firstName', label: 'First Name' },
+                    { key: 'lastName', label: 'Last Name' },
+                    { key: 'teamName', label: 'Team Name' },
+                    { key: 'title', label: 'Title' },
+                    { key: 'firm', label: 'Firm' },
+                    { key: 'branch', label: 'Branch' },
+                    { key: 'city', label: 'City' },
+                    { key: 'province', label: 'Province' },
+                    { key: 'actions', label: 'Actions' }
+                  ].map((column) => (
+                    <th
+                      key={column.key}
+                      onClick={() => column.key !== 'actions' && handleSort(column.key)}
+                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                        column.key !== 'actions' ? 'cursor-pointer hover:bg-gray-100' : ''
+                      } ${column.key === 'actions' ? 'text-right' : ''}`}
+                    >
+                      <div className="flex items-center gap-1">
+                        {column.label}
+                        {column.key !== 'actions' && sortColumn === column.key && (
+                          <ChevronUp
+                            className={`h-4 w-4 transition-transform ${
+                              sortDirection === 'desc' ? 'rotate-180' : ''
+                            }`}
+                          />
+                        )}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {advisors.map((advisor) => (
+                  <tr key={advisor.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.firstName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.lastName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.teamName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.title}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.firm}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.branch}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.city}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {advisor.province}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:text-[#E5D3BC]"
+                          title="Add to Favorites"
+                        >
+                          <Heart className="h-4 w-4" />
+                        </Button>
+                        {advisor.email && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className="hover:text-[#E5D3BC]"
-                            title="Add to Favorites"
+                            title="Send Email"
+                            onClick={() => window.location.href = `mailto:${advisor.email}`}
                           >
-                            <Heart className="h-4 w-4" />
+                            <Mail className="h-4 w-4" />
                           </Button>
-                          {advisor.email && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="hover:text-[#E5D3BC]"
-                              title="Send Email"
-                              onClick={() => window.location.href = `mailto:${advisor.email}`}
-                            >
-                              <Mail className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {advisor.websiteUrl && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="hover:text-[#E5D3BC]"
-                              title="Visit Website"
-                              onClick={() => window.open(advisor.websiteUrl, '_blank')}
-                            >
-                              <Globe className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {advisor.linkedinUrl && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="hover:text-[#E5D3BC]"
-                              title="View LinkedIn Profile"
-                              onClick={() => window.open(advisor.linkedinUrl, '_blank')}
-                            >
-                              <Linkedin className="h-4 w-4" />
-                            </Button>
-                          )}
+                        )}
+                        {advisor.websiteUrl && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:text-red-500"
-                            title="Report Issue"
+                            className="hover:text-[#E5D3BC]"
+                            title="Visit Website"
+                            onClick={() => window.open(advisor.websiteUrl, '_blank')}
                           >
-                            <AlertTriangle className="h-4 w-4" />
+                            <Globe className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        )}
+                        {advisor.linkedinUrl && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:text-[#E5D3BC]"
+                            title="View LinkedIn Profile"
+                            onClick={() => window.open(advisor.linkedinUrl, '_blank')}
+                          >
+                            <Linkedin className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:text-red-500"
+                          title="Report Issue"
+                        >
+                          <AlertTriangle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           
           {/* Infinite scroll trigger */}
