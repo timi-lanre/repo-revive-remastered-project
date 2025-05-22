@@ -5,8 +5,8 @@ export const getCurrentUser = async () => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError) {
-      console.error('Error getting auth user:', authError);
-      return null;
+      console.error('Error getting auth user:', authError.message);
+      throw new Error(`Authentication error: ${authError.message}`);
     }
     
     if (!user) return null;
@@ -20,8 +20,8 @@ export const getCurrentUser = async () => {
         .single();
 
       if (profileError) {
-        console.error('Error getting user profile:', profileError);
-        return null;
+        console.error('Error getting user profile:', profileError.message);
+        throw new Error(`Profile error: ${profileError.message}`);
       }
 
       return {
@@ -30,11 +30,11 @@ export const getCurrentUser = async () => {
       };
     } catch (profileError) {
       console.error('Error fetching user profile:', profileError);
-      return null;
+      throw new Error('Failed to fetch user profile data');
     }
   } catch (error) {
     console.error('Error in getCurrentUser:', error);
-    return null;
+    throw error instanceof Error ? error : new Error('Failed to get current user');
   }
 };
 
@@ -43,7 +43,8 @@ export const isAuthenticated = async (): Promise<boolean> => {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error) throw error;
     return !!session;
-  } catch {
+  } catch (error) {
+    console.error('Authentication check failed:', error);
     return false;
   }
 };
@@ -54,6 +55,6 @@ export const isAdmin = async (): Promise<boolean> => {
     return user?.role === 'admin';
   } catch (error) {
     console.error("Error checking admin status:", error);
-    return false;
+    throw new Error('Failed to verify admin status');
   }
 };

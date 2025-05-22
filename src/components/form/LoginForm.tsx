@@ -27,8 +27,9 @@ const LoginForm = () => {
           window.location.href = isAdmin ? "/admin" : "/dashboard";
         } catch (roleError) {
           console.error("Error checking admin status:", roleError);
-          // Default to dashboard if role check fails
-          window.location.href = "/dashboard";
+          setError("Failed to verify user role. Please try again or contact support.");
+          setIsLoading(false);
+          return;
         }
       } else {
         setError("Invalid credentials. Please check your email and password.");
