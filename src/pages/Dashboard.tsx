@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
@@ -61,9 +60,29 @@ interface MultiSelectProps {
 
 const ITEMS_PER_PAGE = 50;
 
-// Multi-select dropdown component
+// Enhanced multi-select dropdown component with click-outside handling
 const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, placeholder, disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Handle clicking outside of the dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    // Add event listener when dropdown is open
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    // Clean up
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
 
   const handleToggle = (option: string) => {
     const newValue = value.includes(option)
@@ -97,7 +116,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
   const noneSelected = value.length === 0;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <div
         className={`flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background 
           ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} 
@@ -187,6 +206,10 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                     <Checkbox
                       checked={value.includes(option)}
                       onCheckedChange={() => handleToggle(option)}
+                      onClick={(e) => {
+                        // Prevent the parent click from overriding this
+                        e.stopPropagation();
+                      }}
                     />
                     <span className="text-sm">{option}</span>
                   </div>
