@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle, X, ChevronDown } from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
@@ -150,6 +153,8 @@ const Dashboard = () => {
   const [page, setPage] = useState(0);
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null);
+  const [showAdvisorDialog, setShowAdvisorDialog] = useState(false);
 
   // Filter states - current UI selections (not applied yet)
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
@@ -531,6 +536,11 @@ const Dashboard = () => {
     ].length;
   };
 
+  const handleShowAdvisorInfo = (advisor: Advisor) => {
+    setSelectedAdvisor(advisor);
+    setShowAdvisorDialog(true);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -757,6 +767,7 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
+                  
                   <tr key={advisor.id} className="hover:bg-gray-50" style={{ minHeight: '50px' }}>
                     <td className="px-3 py-3 text-sm text-gray-900 break-words">
                       {advisor.firstName}
@@ -791,6 +802,15 @@ const Dashboard = () => {
                           title="Add to Favorites"
                         >
                           <Heart className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="hover:text-[#E5D3BC] h-8 w-8 p-0"
+                          title="View Details"
+                          onClick={() => handleShowAdvisorInfo(advisor)}
+                        >
+                          <Info className="h-4 w-4" />
                         </Button>
                         {advisor.email && (
                           <Button
@@ -850,6 +870,111 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Advisor Info Dialog */}
+      <Dialog open={showAdvisorDialog} onOpenChange={setShowAdvisorDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">
+              Advisor Information
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh] overflow-auto pr-4">
+            {selectedAdvisor && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="font-medium text-gray-500">Name</h3>
+                    <p className="text-lg">{`${selectedAdvisor.firstName} ${selectedAdvisor.lastName}`}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-500">Title</h3>
+                    <p className="text-lg">{selectedAdvisor.title || "N/A"}</p>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h3 className="font-medium text-gray-500">Team</h3>
+                  <p className="text-lg">{selectedAdvisor.teamName || "N/A"}</p>
+                </div>
+                
+                <Separator />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="font-medium text-gray-500">Firm</h3>
+                    <p className="text-lg">{selectedAdvisor.firm}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-500">Branch</h3>
+                    <p className="text-lg">{selectedAdvisor.branch || "N/A"}</p>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="font-medium text-gray-500">City</h3>
+                    <p className="text-lg">{selectedAdvisor.city || "N/A"}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-500">Province</h3>
+                    <p className="text-lg">{selectedAdvisor.province || "N/A"}</p>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <h3 className="font-medium text-gray-500">Contact Information</h3>
+                  <div className="mt-2 space-y-2">
+                    {selectedAdvisor.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-gray-400" />
+                        <a 
+                          href={`mailto:${selectedAdvisor.email}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {selectedAdvisor.email}
+                        </a>
+                      </div>
+                    )}
+                    {selectedAdvisor.websiteUrl && (
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-gray-400" />
+                        <a 
+                          href={selectedAdvisor.websiteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Website
+                        </a>
+                      </div>
+                    )}
+                    {selectedAdvisor.linkedinUrl && (
+                      <div className="flex items-center gap-2">
+                        <Linkedin className="h-4 w-4 text-gray-400" />
+                        <a 
+                          href={selectedAdvisor.linkedinUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          LinkedIn Profile
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
