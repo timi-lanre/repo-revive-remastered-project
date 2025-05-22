@@ -15,10 +15,9 @@ const LoginForm = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
     
     try {
-      setIsLoading(true);
-      
       const result = await authService.loginWithEmailPassword(email, password);
       
       if (result.success) {
@@ -27,15 +26,8 @@ const LoginForm = () => {
           window.location.href = isAdmin ? "/admin" : "/dashboard";
         } catch (roleError: any) {
           console.error("Error checking admin status:", roleError);
-          if (roleError.message.includes('Network error')) {
-            setError("Unable to verify user role due to network issues. Please check your connection and try again.");
-          } else if (roleError.message.includes('No user found')) {
-            setError("User profile not found. Please contact support.");
-          } else {
-            setError("Failed to verify user role. Please try again or contact support.");
-          }
+          setError(roleError.message || "Failed to verify user role. Please try again or contact support.");
           setIsLoading(false);
-          return;
         }
       } else {
         setError("Invalid credentials. Please check your email and password.");
@@ -43,11 +35,17 @@ const LoginForm = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
+      let errorMessage = "An unexpected error occurred. Please try again later.";
+      
       if (error.message.includes('Network error')) {
-        setError("Unable to connect to the server. Please check your internet connection.");
-      } else {
-        setError(error.message || "Failed to login. Please try again later.");
+        errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+      } else if (error.message.includes('Invalid credentials')) {
+        errorMessage = "Invalid email or password. Please try again.";
+      } else if (error.message.includes('Too many requests')) {
+        errorMessage = "Too many login attempts. Please try again later.";
       }
+      
+      setError(errorMessage);
       setIsLoading(false);
     }
   };
@@ -61,11 +59,12 @@ const LoginForm = () => {
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
-            type="text"
+            type="email"
             placeholder="your.email@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={isLoading}
           />
         </div>
         
@@ -78,6 +77,7 @@ const LoginForm = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={isLoading}
           />
         </div>
         

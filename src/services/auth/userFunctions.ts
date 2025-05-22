@@ -6,6 +6,9 @@ export const getCurrentUser = async () => {
     
     if (authError) {
       console.error('Error getting auth user:', authError.message);
+      if (authError.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Unable to connect to authentication service. Please check your internet connection.');
+      }
       throw new Error(`Authentication error: ${authError.message}`);
     }
     
@@ -21,12 +24,15 @@ export const getCurrentUser = async () => {
 
       if (profileError) {
         console.error('Error getting user profile:', profileError.message);
+        if (profileError.message.includes('Failed to fetch')) {
+          throw new Error('Network error: Unable to connect to database. Please check your internet connection.');
+        }
         throw new Error(`Profile error: ${profileError.message}`);
       }
 
       if (!profile) {
         console.error('No profile found for user');
-        throw new Error('User profile not found');
+        throw new Error('User profile not found. Please contact support.');
       }
 
       return {
@@ -34,16 +40,10 @@ export const getCurrentUser = async () => {
         ...profile
       };
     } catch (profileError) {
-      if (profileError instanceof Error && profileError.message.includes('Failed to fetch')) {
-        throw new Error('Network error: Unable to connect to Supabase');
-      }
       console.error('Error fetching user profile:', profileError);
-      throw new Error('Failed to fetch user profile data');
+      throw profileError;
     }
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Failed to fetch')) {
-      throw new Error('Network error: Unable to connect to Supabase');
-    }
     console.error('Error in getCurrentUser:', error);
     throw error instanceof Error ? error : new Error('Failed to get current user');
   }
@@ -52,7 +52,10 @@ export const getCurrentUser = async () => {
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
+    if (error) {
+      console.error('Session check error:', error);
+      return false;
+    }
     return !!session;
   } catch (error) {
     console.error('Authentication check failed:', error);
@@ -64,14 +67,17 @@ export const isAdmin = async (): Promise<boolean> => {
   try {
     const user = await getCurrentUser();
     if (!user) {
-      throw new Error('No user found');
+      throw new Error('No user found. Please sign in again.');
     }
     return user?.role === 'admin';
   } catch (error) {
     console.error("Error checking admin status:", error);
-    if (error instanceof Error && error.message.includes('Network error')) {
-      throw new Error('Unable to verify admin status due to network issues. Please check your connection.');
+    if (error instanceof Error) {
+      if (error.message.includes('Network error')) {
+        throw new Error('Unable to verify admin status due to network issues. Please check your internet connection and try again.');
+      }
+      throw error;
     }
-    throw new Error('Failed to verify admin status');
+    throw new Error('Failed to verify admin status. Please try again later.');
   }
 };
