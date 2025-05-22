@@ -42,24 +42,47 @@ export const signUp = async (
   lastName: string
 ): Promise<{ message: string }> => {
   try {
-    // Create the user through the auth function
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/signup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        firstName,
-        lastName
-      }),
+    const { data: existingUser } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingUser) {
+      throw new Error("User already exists");
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        }
+      }
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create user');
+    if (authError) throw authError;
+    if (!user) throw new Error("Failed to create user");
+
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .insert([
+        {
+          user_id: user.id,
+          email: email,
+          first_name: firstName,
+          last_name: lastName,
+          status: "PENDING",
+          role: "user"
+        }
+      ]);
+
+    if (profileError) {
+      // Rollback: delete auth user if profile creation fails
+      await supabase.auth.admin.deleteUser(user.id);
+      throw profileError;
     }
 
     return { message: "User registration request submitted successfully" };
@@ -69,40 +92,23 @@ export const signUp = async (
   }
 };
 
-export const deleteUser = async (email: string): Promise<void> => {
-  try {
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/delete-user`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({ email }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to delete user');
-    }
-  } catch (error: any) {
-    console.error('Error deleting user:', error);
-    throw error;
-  }
-};
-
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/pending-users`, {
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-    });
+    const { data: profiles, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('status', 'PENDING');
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch pending users');
-    }
+    if (error) throw error;
 
-    return await response.json();
+    return profiles.map(profile => ({
+      id: profile.user_id,
+      email: profile.email,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      createdAt: profile.created_at,
+      status: profile.status as UserStatus
+    }));
   } catch (error) {
     console.error("Error fetching pending users:", error);
     return [];
@@ -111,28 +117,21 @@ export const getPendingUsers = async (): Promise<PendingUser[]> => {
 
 export const approveUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/approve-user/${userId}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-    });
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ status: "APPROVED" })
+      .eq('user_id', userId);
 
-    if (!response.ok) {
-      throw new Error('Failed to approve user');
-    }
+    if (updateError) throw updateError;
 
-    // Get user details for email notification
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name')
+      .select('first_name, email')
       .eq('user_id', userId)
       .single();
 
-    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
-
-    if (profile && user?.email) {
-      await sendEmail('approval', user.email, profile.first_name);
+    if (profile?.email) {
+      await sendEmail('approval', profile.email, profile.first_name);
     }
 
     return { success: true };
@@ -144,28 +143,21 @@ export const approveUser = async (userId: string): Promise<{ success: boolean }>
 
 export const rejectUser = async (userId: string): Promise<{ success: boolean }> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/reject-user/${userId}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-    });
+    const { error: updateError } = await supabase
+      .from('user_profiles')
+      .update({ status: "REJECTED" })
+      .eq('user_id', userId);
 
-    if (!response.ok) {
-      throw new Error('Failed to reject user');
-    }
+    if (updateError) throw updateError;
 
-    // Get user details for email notification
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('first_name')
+      .select('first_name, email')
       .eq('user_id', userId)
       .single();
 
-    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
-
-    if (profile && user?.email) {
-      await sendEmail('rejection', user.email, profile.first_name);
+    if (profile?.email) {
+      await sendEmail('rejection', profile.email, profile.first_name);
     }
 
     return { success: true };
@@ -177,16 +169,19 @@ export const rejectUser = async (userId: string): Promise<{ success: boolean }> 
 
 export const resetPassword = async (userId: string): Promise<void> => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth/reset-password/${userId}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-    });
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('email')
+      .eq('user_id', userId)
+      .single();
 
-    if (!response.ok) {
-      throw new Error('Failed to trigger password reset');
+    if (!profile?.email) {
+      throw new Error('User email not found');
     }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(profile.email);
+    
+    if (error) throw error;
   } catch (error: any) {
     console.error("Error resetting password:", error);
     throw error;
