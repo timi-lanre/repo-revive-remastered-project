@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -72,17 +71,13 @@ const About = () => {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/">Home</Link>
-              </BreadcrumbLink>
+              <BreadcrumbLink as={Link} to="/">Home</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbItem>
               <ChevronRight className="h-4 w-4" />
             </BreadcrumbItem>
             <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/about">About</Link>
-              </BreadcrumbLink>
+              <BreadcrumbLink as={Link} to="/about">About</BreadcrumbLink>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
