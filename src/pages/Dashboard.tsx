@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -10,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle } from "lucide-react";
+import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle, X } from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
@@ -58,11 +59,12 @@ const Dashboard = () => {
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  const [selectedProvince, setSelectedProvince] = useState<string>("all");
-  const [selectedCity, setSelectedCity] = useState<string>("all");
-  const [selectedFirm, setSelectedFirm] = useState<string>("all");
-  const [selectedBranch, setSelectedBranch] = useState<string>("all");
-  const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  // Update state to handle multiple selections
+  const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedFavoritesList, setSelectedFavoritesList] = useState<string>("all");
   const [selectedReportList, setSelectedReportList] = useState<string>("all");
 
@@ -90,11 +92,22 @@ const Dashboard = () => {
         query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`);
       }
 
-      if (selectedProvince !== "all") query = query.eq('province', selectedProvince);
-      if (selectedCity !== "all") query = query.eq('city', selectedCity);
-      if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
-      if (selectedBranch !== "all") query = query.eq('branch', selectedBranch);
-      if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
+      // Apply multiple filters
+      if (selectedProvinces.length > 0) {
+        query = query.in('province', selectedProvinces);
+      }
+      if (selectedCities.length > 0) {
+        query = query.in('city', selectedCities);
+      }
+      if (selectedFirms.length > 0) {
+        query = query.in('firm', selectedFirms);
+      }
+      if (selectedBranches.length > 0) {
+        query = query.in('branch', selectedBranches);
+      }
+      if (selectedTeams.length > 0) {
+        query = query.in('team_name', selectedTeams);
+      }
 
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
@@ -108,11 +121,7 @@ const Dashboard = () => {
       };
 
       const dbColumn = columnMap[sortColumn] || sortColumn;
-      if (sortDirection === 'asc') {
-        query = query.order(dbColumn, { ascending: true, nullsLast: true });
-      } else {
-        query = query.order(dbColumn, { ascending: false, nullsFirst: true });
-      }
+      query = query.order(dbColumn, { ascending: sortDirection === 'asc' });
 
       const { data, count, error } = await query
         .range(pageNumber * ITEMS_PER_PAGE, (pageNumber + 1) * ITEMS_PER_PAGE - 1);
@@ -151,17 +160,18 @@ const Dashboard = () => {
     try {
       let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
-      if (selectedProvince !== "all") {
-        query = query.eq('province', selectedProvince);
+      // Apply cascading filters
+      if (selectedProvinces.length > 0) {
+        query = query.in('province', selectedProvinces);
       }
-      if (selectedCity !== "all") {
-        query = query.eq('city', selectedCity);
+      if (selectedCities.length > 0) {
+        query = query.in('city', selectedCities);
       }
-      if (selectedFirm !== "all") {
-        query = query.eq('firm', selectedFirm);
+      if (selectedFirms.length > 0) {
+        query = query.in('firm', selectedFirms);
       }
-      if (selectedBranch !== "all") {
-        query = query.eq('branch', selectedBranch);
+      if (selectedBranches.length > 0) {
+        query = query.in('branch', selectedBranches);
       }
 
       const { data, error } = await query;
@@ -184,37 +194,60 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadFilterOptions();
-  }, [selectedProvince, selectedCity, selectedFirm, selectedBranch]);
+  }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches]);
 
-  const handleFilterChange = async (value: string, filterType: string) => {
+  const handleFilterChange = async (value: string[], filterType: string) => {
     switch (filterType) {
       case 'province':
-        setSelectedProvince(value);
-        setSelectedCity('all');
-        setSelectedFirm('all');
-        setSelectedBranch('all');
-        setSelectedTeam('all');
+        setSelectedProvinces(value);
+        setSelectedCities([]);
+        setSelectedFirms([]);
+        setSelectedBranches([]);
+        setSelectedTeams([]);
         break;
       case 'city':
-        setSelectedCity(value);
-        setSelectedFirm('all');
-        setSelectedBranch('all');
-        setSelectedTeam('all');
+        setSelectedCities(value);
+        setSelectedFirms([]);
+        setSelectedBranches([]);
+        setSelectedTeams([]);
         break;
       case 'firm':
-        setSelectedFirm(value);
-        setSelectedBranch('all');
-        setSelectedTeam('all');
+        setSelectedFirms(value);
+        setSelectedBranches([]);
+        setSelectedTeams([]);
         break;
       case 'branch':
-        setSelectedBranch(value);
-        setSelectedTeam('all');
+        setSelectedBranches(value);
+        setSelectedTeams([]);
         break;
       case 'team':
-        setSelectedTeam(value);
+        setSelectedTeams(value);
         break;
     }
 
+    setPage(0);
+    await loadAdvisors(0, searchQuery);
+  };
+
+  const removeFilter = async (type: string, value: string) => {
+    switch (type) {
+      case 'province':
+        setSelectedProvinces(prev => prev.filter(p => p !== value));
+        break;
+      case 'city':
+        setSelectedCities(prev => prev.filter(c => c !== value));
+        break;
+      case 'firm':
+        setSelectedFirms(prev => prev.filter(f => f !== value));
+        break;
+      case 'branch':
+        setSelectedBranches(prev => prev.filter(b => b !== value));
+        break;
+      case 'team':
+        setSelectedTeams(prev => prev.filter(t => t !== value));
+        break;
+    }
+    
     setPage(0);
     await loadAdvisors(0, searchQuery);
   };
@@ -224,7 +257,7 @@ const Dashboard = () => {
       setPage(0);
       loadAdvisors(0, term);
     }, 300),
-    [selectedProvince, selectedCity, selectedFirm, selectedBranch, selectedTeam]
+    [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams]
   );
 
   useEffect(() => {
@@ -292,19 +325,17 @@ const Dashboard = () => {
   };
 
   const resetFilters = async () => {
-    setSelectedProvince("all");
-    setSelectedCity("all");
-    setSelectedFirm("all");
-    setSelectedBranch("all");
-    setSelectedTeam("all");
+    setSelectedProvinces([]);
+    setSelectedCities([]);
+    setSelectedFirms([]);
+    setSelectedBranches([]);
+    setSelectedTeams([]);
     setSelectedFavoritesList("all");
     setSelectedReportList("all");
     
     setSearchQuery("");
-    
     setSortColumn("firstName");
     setSortDirection("asc");
-    
     setPage(0);
     
     if (tableContainerRef.current) {
@@ -312,7 +343,6 @@ const Dashboard = () => {
     }
     
     await loadAdvisors(0, "");
-    
     await loadFilterOptions();
   };
 
@@ -327,6 +357,84 @@ const Dashboard = () => {
     }
     setPage(0);
     loadAdvisors(0, searchQuery);
+  };
+
+  const SelectedFilters = () => {
+    const hasFilters = selectedProvinces.length > 0 || selectedCities.length > 0 || 
+                      selectedFirms.length > 0 || selectedBranches.length > 0 || 
+                      selectedTeams.length > 0;
+
+    if (!hasFilters) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2 mb-4">
+        {selectedProvinces.map(province => (
+          <Badge 
+            key={`province-${province}`}
+            variant="secondary"
+            className="flex items-center gap-1"
+          >
+            Province: {province}
+            <X 
+              className="h-3 w-3 cursor-pointer" 
+              onClick={() => removeFilter('province', province)}
+            />
+          </Badge>
+        ))}
+        {selectedCities.map(city => (
+          <Badge 
+            key={`city-${city}`}
+            variant="secondary"
+            className="flex items-center gap-1"
+          >
+            City: {city}
+            <X 
+              className="h-3 w-3 cursor-pointer" 
+              onClick={() => removeFilter('city', city)}
+            />
+          </Badge>
+        ))}
+        {selectedFirms.map(firm => (
+          <Badge 
+            key={`firm-${firm}`}
+            variant="secondary"
+            className="flex items-center gap-1"
+          >
+            Firm: {firm}
+            <X 
+              className="h-3 w-3 cursor-pointer" 
+              onClick={() => removeFilter('firm', firm)}
+            />
+          </Badge>
+        ))}
+        {selectedBranches.map(branch => (
+          <Badge 
+            key={`branch-${branch}`}
+            variant="secondary"
+            className="flex items-center gap-1"
+          >
+            Branch: {branch}
+            <X 
+              className="h-3 w-3 cursor-pointer" 
+              onClick={() => removeFilter('branch', branch)}
+            />
+          </Badge>
+        ))}
+        {selectedTeams.map(team => (
+          <Badge 
+            key={`team-${team}`}
+            variant="secondary"
+            className="flex items-center gap-1"
+          >
+            Team: {team}
+            <X 
+              className="h-3 w-3 cursor-pointer" 
+              onClick={() => removeFilter('team', team)}
+            />
+          </Badge>
+        ))}
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -409,14 +517,14 @@ const Dashboard = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <Select 
-              value={selectedProvince} 
+              value={selectedProvinces} 
               onValueChange={(value) => handleFilterChange(value, 'province')}
+              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Provinces" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Provinces</SelectItem>
                 {filterOptions.provinces.map((province) => (
                   <SelectItem key={province} value={province}>
                     {province}
@@ -426,14 +534,14 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedCity} 
+              value={selectedCities} 
               onValueChange={(value) => handleFilterChange(value, 'city')}
+              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Cities" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Cities</SelectItem>
                 {filterOptions.cities.map((city) => (
                   <SelectItem key={city} value={city}>
                     {city}
@@ -443,14 +551,14 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedFirm} 
+              value={selectedFirms} 
               onValueChange={(value) => handleFilterChange(value, 'firm')}
+              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Firms" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Firms</SelectItem>
                 {filterOptions.firms.map((firm) => (
                   <SelectItem key={firm} value={firm}>
                     {firm}
@@ -460,14 +568,14 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedBranch} 
+              value={selectedBranches} 
               onValueChange={(value) => handleFilterChange(value, 'branch')}
+              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
                 {filterOptions.branches.map((branch) => (
                   <SelectItem key={branch} value={branch}>
                     {branch}
@@ -477,14 +585,14 @@ const Dashboard = () => {
             </Select>
 
             <Select 
-              value={selectedTeam} 
+              value={selectedTeams} 
               onValueChange={(value) => handleFilterChange(value, 'team')}
+              multiple
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Teams" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
                 {filterOptions.teams.map((team) => (
                   <SelectItem key={team} value={team}>
                     {team}
@@ -502,6 +610,8 @@ const Dashboard = () => {
               </SelectContent>
             </Select>
           </div>
+
+          <SelectedFilters />
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={resetFilters}>
