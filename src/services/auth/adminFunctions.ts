@@ -22,7 +22,7 @@ export const createUser = async (
   firstName: string, 
   lastName: string, 
   email: string
-): Promise<{ success: boolean }> => {
+): Promise<{ success: boolean; message?: string }> => {
   try {
     console.log('Creating user:', { firstName, lastName, email });
     
@@ -46,26 +46,40 @@ export const createUser = async (
         }),
       });
       
-      if (response.ok) {
-        const result = await response.json();
-        console.log('User created successfully via Edge Function:', result);
-        return { success: true };
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ 
+          error: `HTTP error: ${response.status} ${response.statusText}` 
+        }));
+        
+        console.error('Edge Function error:', errorData);
+        
+        if (response.status === 404) {
+          console.log('Edge Function not found, falling back to direct API');
+          const result = await createUserDirectly(email, password, firstName, lastName);
+          return { 
+            ...result, 
+            message: "User created via direct API (Edge Function not available)"
+          };
+        }
+        
+        throw new Error(errorData.error || `Failed to create user: ${response.statusText}`);
       }
       
-      const errorData = await response.json();
-      console.error('Edge Function error:', errorData);
+      const result = await response.json();
+      console.log('User created successfully via Edge Function:', result);
+      return { 
+        success: true,
+        message: "User created successfully via Edge Function" + (result.emailSent ? " and welcome email sent" : "")
+      };
       
-      // If we get a Not Found error, the function might not be deployed
-      // Fall back to direct API calls
-      if (errorData.error === "Not Found") {
-        console.log('Edge Function not found, falling back to direct API');
-        return await createUserDirectly(email, password, firstName, lastName);
-      }
-      
-      throw new Error(errorData.error || 'Failed to create user');
-      
-    } catch (edgeError) {
+    } catch (edgeError: any) {
       console.error('Edge Function failed, falling back to direct API:', edgeError);
+      
+      // Check if it's a network error (offline)
+      if (edgeError instanceof TypeError && edgeError.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Please check your internet connection and try again.');
+      }
+      
       return await createUserDirectly(email, password, firstName, lastName);
     }
     
@@ -81,7 +95,7 @@ const createUserDirectly = async (
   password: string,
   firstName: string,
   lastName: string
-): Promise<{ success: boolean }> => {
+): Promise<{ success: boolean; message?: string }> => {
   try {
     console.log('Creating user directly via Supabase API');
     
@@ -144,11 +158,37 @@ const createUserDirectly = async (
       throw new Error(`Failed to create user profile: ${profileError.message}`);
     }
     
-    // Send password to user via email would normally happen here
-    // For now we'll just log it since we don't have email set up
+    // Since we're not using Edge Functions, we don't have the send-email functionality
+    // Log the password for development purposes
     console.log(`Password for ${email}: ${password} (would be sent via email)`);
     
-    return { success: true };
+    // Attempt to send welcome email directly if possible
+    try {
+      // This is just a failsafe attempt in case the email function is available
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          type: 'account_created',
+          email,
+          firstName,
+          password,
+          loginUrl: `${window.location.origin}/login`
+        }),
+      });
+      console.log('Attempted to send welcome email');
+    } catch (emailError) {
+      console.warn('Could not send welcome email:', emailError);
+      // Don't fail if email sending fails
+    }
+    
+    return { 
+      success: true,
+      message: `User created successfully. Password: ${password} (this would normally be sent by email)`
+    };
   } catch (error: any) {
     console.error('Error in direct user creation:', error);
     throw error;
@@ -170,7 +210,7 @@ export const resetPassword = async (userId: string): Promise<void> => {
 
     // Send password reset email
     const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
-      redirectTo: `https://advisorconnect.ca/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
 
     if (error) throw error;

@@ -18,11 +18,13 @@ const CreateUserForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(false);
+    setResultMessage(null);
     
     // Basic validation
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
@@ -46,9 +48,11 @@ const CreateUserForm = () => {
       
       if (result.success) {
         setSuccess(true);
+        setResultMessage(result.message || "User created successfully!");
+        
         toast({
           title: "User Created Successfully",
-          description: `User ${firstName} ${lastName} has been created. An email with login credentials has been sent to ${email}.`
+          description: `User ${firstName} ${lastName} has been created.${result.message ? ` ${result.message}` : ''}`
         });
         
         // Reset form
@@ -97,7 +101,7 @@ const CreateUserForm = () => {
           <Alert className="mb-4 bg-green-50 border-green-200">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800">
-              User created successfully! They will receive an email with login instructions.
+              {resultMessage || "User created successfully! They will receive an email with login instructions."}
             </AlertDescription>
           </Alert>
         )}
