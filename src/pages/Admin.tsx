@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { authService, PendingUser, UserStatus } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, UserX, RefreshCcw, LogOut, Key } from "lucide-react";
+import { UserCheck, UserX, RefreshCcw, LogOut, LayoutDashboard, Key } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 
@@ -226,6 +226,14 @@ const Admin = () => {
           <div className="flex justify-between items-center h-16">
             <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
             <div className="flex items-center gap-4">
+              <Button 
+                onClick={() => navigate('/dashboard')}
+                variant="outline"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                View Dashboard
+              </Button>
               <Button 
                 onClick={refreshUsers} 
                 variant="outline"
