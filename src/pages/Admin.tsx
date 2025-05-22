@@ -1,4 +1,3 @@
-
 // src/pages/Admin.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +29,15 @@ const Admin = () => {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("create");
+
+  // Function to handle tab change and automatically refresh user list when switching to "all" tab
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (value === "all") {
+      refreshUsers();
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -37,22 +45,23 @@ const Admin = () => {
       let authUsers: any[] = [];
       
       try {
+        // This call is expected to fail with standard client permissions
+        // Only succeeds with service role key on the server
         const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
         
         if (authError) {
-          console.error("Error loading auth users:", authError);
-          // If we can't access auth.admin, we'll only show users with profiles
+          console.log("Note: Auth admin API not accessible with current permissions - this is normal");
           authUsers = [];
         } else {
           authUsers = authData.users || [];
         }
       } catch (error) {
-        console.error("Auth admin not accessible:", error);
-        // Fallback to only showing users with profiles
+        console.log("Note: Auth admin API not accessible - using profiles only");
+        // This is expected - continue with just profiles
         authUsers = [];
       }
       
-      // Load all profile data
+      // Load all profile data - this should work with proper RLS policies
       const { data: profiles, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -64,49 +73,28 @@ const Admin = () => {
       }
       
       console.log("Loaded profiles:", profiles);
-      console.log("Loaded auth users:", authUsers);
       
-      // Create combined user list
+      // Create combined user list from profiles
       const usersWithProfile: UserProfile[] = [];
       
-      // First, add all users from profiles table
+      // Add all users from profiles table
       if (profiles && profiles.length > 0) {
         profiles.forEach(profile => {
-          const authUser = authUsers.find(user => user.id === profile.user_id);
-          
           usersWithProfile.push({
             id: profile.user_id,
-            email: profile.email || authUser?.email || 'No email',
-            firstName: profile.first_name || authUser?.user_metadata?.first_name || 'Unknown',
-            lastName: profile.last_name || authUser?.user_metadata?.last_name || 'Unknown',
+            email: profile.email || 'No email',
+            firstName: profile.first_name || 'Unknown',
+            lastName: profile.last_name || 'Unknown',
             status: profile.status || 'UNKNOWN',
             role: profile.role || 'user',
-            createdAt: profile.created_at || authUser?.created_at || new Date().toISOString()
+            createdAt: profile.created_at || new Date().toISOString()
           });
-        });
-      }
-      
-      // Then, add any auth users that don't have profiles
-      if (authUsers.length > 0) {
-        authUsers.forEach(authUser => {
-          const existsInProfiles = profiles?.some(profile => profile.user_id === authUser.id);
-          
-          if (!existsInProfiles) {
-            usersWithProfile.push({
-              id: authUser.id,
-              email: authUser.email || 'No email',
-              firstName: authUser.user_metadata?.first_name || 'Unknown',
-              lastName: authUser.user_metadata?.last_name || 'Unknown',
-              status: 'NO_PROFILE',
-              role: 'user',
-              createdAt: authUser.created_at
-            });
-          }
         });
       }
       
       console.log("Combined users:", usersWithProfile);
       setAllUsers(usersWithProfile);
+      setLoadingError(null);
       
     } catch (error: any) {
       console.error("Error loading users:", error);
@@ -234,6 +222,18 @@ const Admin = () => {
     };
     
     checkAuth();
+    
+    // Listen for user created events
+    const handleUserCreated = () => {
+      console.log("User created event detected, refreshing list");
+      refreshUsers();
+    };
+    
+    window.addEventListener('userCreated', handleUserCreated);
+    
+    return () => {
+      window.removeEventListener('userCreated', handleUserCreated);
+    };
   }, [navigate]);
 
   const formatDate = (dateString: string) => {
@@ -306,7 +306,7 @@ const Admin = () => {
           </div>
         )}
         
-        <Tabs defaultValue="create" className="space-y-4">
+        <Tabs defaultValue="create" className="space-y-4" value={activeTab} onValueChange={handleTabChange}>
           <TabsList>
             <TabsTrigger value="create">
               <UserPlus className="h-4 w-4 mr-2" />
@@ -346,47 +346,55 @@ const Admin = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {allUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">
-                            {user.firstName} {user.lastName}
-                          </TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>
-                            <Badge variant={
-                              user.status === 'APPROVED' ? 'default' : 
-                              user.status === 'NO_PROFILE' ? 'destructive' : 
-                              'secondary'
-                            }>
-                              {user.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{user.role}</TableCell>
-                          <TableCell>{formatDate(user.createdAt)}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              {user.status === 'NO_PROFILE' ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => createProfileForUser(user.id, user.email, user.firstName, user.lastName)}
-                                >
-                                  Create Profile
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleResetPassword(user.id, user.email)}
-                                >
-                                  <Key className="h-4 w-4 mr-1" />
-                                  Reset Password
-                                </Button>
-                              )}
-                            </div>
+                      {allUsers.length > 0 ? (
+                        allUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              {user.firstName} {user.lastName}
+                            </TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={
+                                user.status === 'APPROVED' ? 'default' : 
+                                user.status === 'NO_PROFILE' ? 'destructive' : 
+                                'secondary'
+                              }>
+                                {user.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{user.role}</TableCell>
+                            <TableCell>{formatDate(user.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                {user.status === 'NO_PROFILE' ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => createProfileForUser(user.id, user.email, user.firstName, user.lastName)}
+                                  >
+                                    Create Profile
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleResetPassword(user.id, user.email)}
+                                  >
+                                    <Key className="h-4 w-4 mr-1" />
+                                    Reset Password
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="h-24 text-center">
+                            No users found. Create a new user or refresh the list.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>
