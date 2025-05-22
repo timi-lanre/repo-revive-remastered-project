@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services/auth';
@@ -13,6 +14,7 @@ const AuthCallback = () => {
       try {
         setIsProcessing(true);
         
+        // Since we're now only using Supabase, check the session directly
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) throw error;
