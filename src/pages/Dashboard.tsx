@@ -32,6 +32,7 @@ const Dashboard = () => {
   const [lastLogin, setLastLogin] = useState<string | null>(null);
   const [latestNews, setLatestNews] = useState("");
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
+  const [totalAdvisors, setTotalAdvisors] = useState(0);
 
   // Filters
   const [selectedProvince, setSelectedProvince] = useState<string>("");
@@ -73,7 +74,14 @@ const Dashboard = () => {
           setLatestNews(newsData.content);
         }
 
-        // Load advisors
+        // Get total count of advisors
+        const { count } = await supabase
+          .from('advisors')
+          .select('*', { count: 'exact', head: true });
+        
+        setTotalAdvisors(count || 0);
+
+        // Load advisors with pagination
         const { data: advisorsData } = await supabase
           .from('advisors')
           .select('*')
@@ -165,6 +173,19 @@ const Dashboard = () => {
             Last login: {lastLogin || "Loading..."}
           </p>
         </div>
+
+        {/* Database Stats */}
+        <Card className="p-4 mb-8 bg-[#E5D3BC]/10 border-[#E5D3BC]">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
+            <div>
+              <h2 className="font-medium text-gray-900">Database Status</h2>
+              <p className="text-gray-600 mt-1">
+                Total Advisors: {totalAdvisors.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </Card>
 
         {/* Latest News */}
         <Card className="p-4 mb-8 bg-[#E5D3BC]/10 border-[#E5D3BC]">
