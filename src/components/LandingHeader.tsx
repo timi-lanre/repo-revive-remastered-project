@@ -43,3 +43,5 @@ const LandingHeader = () => {
     </div>
   );
 };
+
+export default LandingHeader
