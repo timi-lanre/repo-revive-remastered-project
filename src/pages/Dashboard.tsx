@@ -1,22 +1,14 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Info, Search, ChevronUp, Heart, Mail, Globe, Linkedin, AlertTriangle, X, ChevronDown } from "lucide-react";
 import { authService } from "@/services/auth";
 import { supabase } from "@/lib/supabase";
 import debounce from "@/lib/debounce";
-import React, { useState, useEffect, useCallback, useRef } from "react";
 
 interface Advisor {
   id: string;
@@ -47,74 +39,71 @@ interface MultiSelectProps {
   options: string[];
   placeholder: string;
   disabled?: boolean;
-  showAll?: boolean;
 }
 
-const ITEMS_PER_PAGE = 13;
+const ITEMS_PER_PAGE = 50;
 
-const MultiSelect: React.FC<MultiSelectProps> = ({ 
-  value, 
-  onChange, 
-  options, 
-  placeholder, 
-  disabled = false, 
-  showAll = false 
-}) => {
+// Multi-select dropdown component
+const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, placeholder, disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   const handleToggle = (option: string) => {
-    if (option === "All") {
-      onChange([]);
-    } else {
-      const newValue = value.includes(option)
-        ? value.filter(v => v !== option)
-        : [...value, option];
-      onChange(newValue);
-    }
-    setIsOpen(false);
+    const newValue = value.includes(option)
+      ? value.filter(v => v !== option)
+      : [...value, option];
+    onChange(newValue);
   };
 
-  const displayValue = value.length === 0 ? "All" : value.length === 1 ? value[0] : `${value.length} selected`;
+  const handleRemove = (option: string) => {
+    onChange(value.filter(v => v !== option));
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <div
         className={`flex min-h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background 
           ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} 
           focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
-        <span className={value.length === 0 ? "text-muted-foreground" : "text-foreground"}>
-          {displayValue}
-        </span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <div className="flex flex-wrap gap-1 flex-1">
+          {value.length === 0 ? (
+            <span className="text-muted-foreground">{placeholder}</span>
+          ) : (
+            value.map((item) => (
+              <Badge key={item} variant="secondary" className="text-xs">
+                {item}
+                <X
+                  className="ml-1 h-3 w-3 cursor-pointer hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove(item);
+                  }}
+                />
+              </Badge>
+            ))
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {value.length > 0 && (
+            <X
+              className="h-4 w-4 cursor-pointer hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClear();
+              }}
+            />
+          )}
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
       </div>
 
       {isOpen && !disabled && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover p-1 shadow-md">
-          {showAll && (
-            <div
-              className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
-              onClick={() => handleToggle("All")}
-            >
-              <Checkbox checked={value.length === 0} readOnly />
-              <span className="text-sm font-semibold">All</span>
-            </div>
-          )}
           {options.length === 0 ? (
             <div className="py-2 px-3 text-sm text-muted-foreground">No options available</div>
           ) : (
@@ -124,7 +113,10 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                 className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
                 onClick={() => handleToggle(option)}
               >
-                <Checkbox checked={value.includes(option)} readOnly />
+                <Checkbox
+                  checked={value.includes(option)}
+                  onChange={() => handleToggle(option)}
+                />
                 <span className="text-sm">{option}</span>
               </div>
             ))
@@ -150,23 +142,12 @@ const Dashboard = () => {
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Dialog states
-  const [showAdvisorDialog, setShowAdvisorDialog] = useState(false);
-  const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null);
-
-  // Filter states - current UI selections (not applied yet)
+  // Multi-select filter states
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-
-  // Applied filters - what's actually filtering the data
-  const [appliedProvinces, setAppliedProvinces] = useState<string[]>([]);
-  const [appliedCities, setAppliedCities] = useState<string[]>([]);
-  const [appliedFirms, setAppliedFirms] = useState<string[]>([]);
-  const [appliedBranches, setAppliedBranches] = useState<string[]>([]);
-  const [appliedTeams, setAppliedTeams] = useState<string[]>([]);
 
   // All available filter options (unfiltered)
   const [allFilterOptions, setAllFilterOptions] = useState<FilterOptions>({
@@ -177,7 +158,7 @@ const Dashboard = () => {
     teams: []
   });
 
-  // Filtered options based on current UI selections (for cascading)
+  // Filtered options based on current selections
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     provinces: [],
     cities: [],
@@ -187,9 +168,9 @@ const Dashboard = () => {
   });
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
   const { ref, inView } = useInView({
     threshold: 0,
-    rootMargin: "400px"
   });
 
   // Load all filter options on component mount
@@ -216,11 +197,12 @@ const Dashboard = () => {
     }
   };
 
-  // Update cascading filter options based on current UI selections
+  // Update cascading filter options based on current selections
   const updateCascadingFilters = async () => {
     try {
       let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
+      // Apply current filters to determine what options should be available
       if (selectedProvinces.length > 0) {
         query = query.in('province', selectedProvinces);
       }
@@ -240,6 +222,7 @@ const Dashboard = () => {
       const { data, error } = await query;
       if (error) throw error;
 
+      // Determine which filters have selections
       const hasAnyFilter = selectedProvinces.length > 0 || selectedCities.length > 0 || 
                           selectedFirms.length > 0 || selectedBranches.length > 0 || selectedTeams.length > 0;
 
@@ -247,15 +230,19 @@ const Dashboard = () => {
         provinces: hasAnyFilter ? 
           Array.from(new Set([...selectedProvinces, ...data.map(d => d.province).filter(Boolean)])).sort() :
           allFilterOptions.provinces,
+        
         cities: hasAnyFilter ?
           Array.from(new Set([...selectedCities, ...data.map(d => d.city).filter(Boolean)])).sort() :
           allFilterOptions.cities,
+        
         firms: hasAnyFilter ?
           Array.from(new Set([...selectedFirms, ...data.map(d => d.firm).filter(Boolean)])).sort() :
           allFilterOptions.firms,
+        
         branches: hasAnyFilter ?
           Array.from(new Set([...selectedBranches, ...data.map(d => d.branch).filter(Boolean)])).sort() :
           allFilterOptions.branches,
+        
         teams: hasAnyFilter ?
           Array.from(new Set([...selectedTeams, ...data.map(d => d.team_name).filter(Boolean)])).sort() :
           allFilterOptions.teams
@@ -263,6 +250,7 @@ const Dashboard = () => {
 
       setFilterOptions(newOptions);
 
+      // Remove selected values that are no longer available
       const validProvinces = selectedProvinces.filter(p => newOptions.provinces.includes(p));
       if (validProvinces.length !== selectedProvinces.length) {
         setSelectedProvinces(validProvinces);
@@ -287,6 +275,7 @@ const Dashboard = () => {
       if (validTeams.length !== selectedTeams.length) {
         setSelectedTeams(validTeams);
       }
+
     } catch (error) {
       console.error("Error updating cascading filters:", error);
     }
@@ -302,16 +291,19 @@ const Dashboard = () => {
         .from('advisors')
         .select('*', { count: 'exact' });
 
+      // Apply search filter
       if (searchTerm.trim()) {
         query = query.or(`first_name.ilike.%${searchTerm.trim()}%,last_name.ilike.%${searchTerm.trim()}%`);
       }
 
-      if (appliedProvinces.length > 0) query = query.in('province', appliedProvinces);
-      if (appliedCities.length > 0) query = query.in('city', appliedCities);
-      if (appliedFirms.length > 0) query = query.in('firm', appliedFirms);
-      if (appliedBranches.length > 0) query = query.in('branch', appliedBranches);
-      if (appliedTeams.length > 0) query = query.in('team_name', appliedTeams);
+      // Apply multi-select filters
+      if (selectedProvinces.length > 0) query = query.in('province', selectedProvinces);
+      if (selectedCities.length > 0) query = query.in('city', selectedCities);
+      if (selectedFirms.length > 0) query = query.in('firm', selectedFirms);
+      if (selectedBranches.length > 0) query = query.in('branch', selectedBranches);
+      if (selectedTeams.length > 0) query = query.in('team_name', selectedTeams);
 
+      // Apply sorting
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
         lastName: 'last_name',
@@ -364,6 +356,7 @@ const Dashboard = () => {
     }
   };
 
+  // Debounced search
   const debouncedSearch = useCallback(
     debounce((term: string) => {
       setPage(0);
@@ -372,9 +365,10 @@ const Dashboard = () => {
       }
       loadAdvisors(0, term, true);
     }, 300),
-    [appliedProvinces, appliedCities, appliedFirms, appliedBranches, appliedTeams, sortColumn, sortDirection]
+    [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]
   );
 
+  // Handle infinite scroll
   useEffect(() => {
     if (inView && hasMore && !loadingAdvisors && advisors.length > 0) {
       const nextPage = page + 1;
@@ -383,22 +377,29 @@ const Dashboard = () => {
     }
   }, [inView, hasMore, loadingAdvisors, advisors.length, page, searchQuery]);
 
+  // Update cascading filters when any filter changes
   useEffect(() => {
     if (allFilterOptions.provinces.length > 0) {
       updateCascadingFilters();
     }
   }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, allFilterOptions]);
 
+  // Reload advisors when filters change
   useEffect(() => {
-    if (allFilterOptions.provinces.length > 0) {
-      setPage(0);
-      if (tableContainerRef.current) {
-        tableContainerRef.current.scrollTop = 0;
+    const timer = setTimeout(() => {
+      if (!loadingAdvisors && allFilterOptions.provinces.length > 0) {
+        setPage(0);
+        if (tableContainerRef.current) {
+          tableContainerRef.current.scrollTop = 0;
+        }
+        loadAdvisors(0, searchQuery, true);
       }
-      loadAdvisors(0, searchQuery, true);
-    }
-  }, [appliedProvinces, appliedCities, appliedFirms, appliedBranches, appliedTeams, sortColumn, sortDirection]);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]);
 
+  // Initial load
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -456,17 +457,12 @@ const Dashboard = () => {
     }
   };
 
-  const resetFilters = () => {
+  const resetFilters = async () => {
     setSelectedProvinces([]);
     setSelectedCities([]);
     setSelectedFirms([]);
     setSelectedBranches([]);
     setSelectedTeams([]);
-    setAppliedProvinces([]);
-    setAppliedCities([]);
-    setAppliedFirms([]);
-    setAppliedBranches([]);
-    setAppliedTeams([]);
     setSearchQuery("");
     setSortColumn("firstName");
     setSortDirection("asc");
@@ -476,10 +472,14 @@ const Dashboard = () => {
       tableContainerRef.current.scrollTop = 0;
     }
     
+    // Reset filter options to show all
     setFilterOptions(allFilterOptions);
+    
+    // Reload with no filters
+    await loadAdvisors(0, "", true);
   };
 
-  const handleSort = (column: string) => {
+  const handleSort = async (column: string) => {
     if (column === 'actions' || loadingAdvisors) return;
     
     let newSortDirection: "asc" | "desc" = "asc";
@@ -495,34 +495,17 @@ const Dashboard = () => {
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTop = 0;
     }
+    
+    // Force reload with new sort
+    await loadAdvisors(0, searchQuery, true);
   };
 
-  const applyFilters = () => {
-    setAppliedProvinces(selectedProvinces);
-    setAppliedCities(selectedCities);
-    setAppliedFirms(selectedFirms);
-    setAppliedBranches(selectedBranches);
-    setAppliedTeams(selectedTeams);
-    
+  const applyFilters = async () => {
     setPage(0);
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTop = 0;
     }
-  };
-
-  const getActiveFiltersCount = () => {
-    return [
-      ...appliedProvinces,
-      ...appliedCities,
-      ...appliedFirms,
-      ...appliedBranches,
-      ...appliedTeams
-    ].length;
-  };
-
-  const handleAdvisorClick = (advisor: Advisor) => {
-    setSelectedAdvisor(advisor);
-    setShowAdvisorDialog(true);
+    await loadAdvisors(0, searchQuery, true);
   };
 
   if (isLoading) {
@@ -538,28 +521,30 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      {/* Header - Reduced size */}
-      <div className="w-full px-4 sm:px-8 md:px-12 py-3 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
+      {/* Header */}
+      <div className="w-full px-4 sm:px-8 md:px-12 py-6 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto">
             <img
               src="/lovable-uploads/8af3a359-89c1-4bf8-a9ea-f2255c283985.png"
               alt="Advisor Connect"
-              className="h-8 object-contain"
+              width={268}
+              height={100}
+              className="object-contain"
             />
           </div>
           
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
-              className="relative text-[#1E293B] font-semibold text-sm px-3 py-1 rounded-lg border border-black/10
+              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-black/10
                 bg-white/20 text-black after:content-[''] after:absolute after:bottom-0 after:left-[10%] after:w-4/5 after:h-0.5 after:bg-black"
             >
               Home
             </Button>
             <Button
               variant="ghost"
-              className="relative text-[#1E293B] font-semibold text-sm px-3 py-1 rounded-lg border border-transparent
+              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-transparent
                 hover:bg-white/20 hover:border-black/10 hover:text-black hover:-translate-y-0.5 transition-all duration-300"
               onClick={() => navigate("/about")}
             >
@@ -567,7 +552,7 @@ const Dashboard = () => {
             </Button>
             <Button
               variant="ghost"
-              className="relative text-[#1E293B] font-semibold text-sm px-3 py-1 rounded-lg border border-transparent
+              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-transparent
                 hover:bg-white/20 hover:border-black/10 hover:text-black hover:-translate-y-0.5 transition-all duration-300"
               onClick={handleLogout}
             >
@@ -575,142 +560,129 @@ const Dashboard = () => {
             </Button>
           </div>
         </div>
+
+        <div className="mt-8">
+          <h1 className="text-2xl font-bold text-[#111827]">
+            Welcome back, {userName}
+          </h1>
+          <p className="text-sm text-gray-700">
+            Last login: {lastLogin || "Loading..."}
+          </p>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="w-full max-w-[1800px] mx-auto px-4 py-4">
-        {/* Welcome Section - More compact */}
-        <div className="mb-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-lg font-bold text-[#111827] mb-1">
-                Welcome back, {userName}
-              </h1>
-              <p className="text-xs text-gray-600">
-                Last login: {lastLogin || "Loading..."}
-              </p>
-            </div>
-            
-            {latestNews && (
-              <div className="flex items-start gap-2 text-gray-600 bg-[#E5D3BC]/10 p-2 rounded-lg border border-[#E5D3BC] max-w-md">
-                <Info className="h-4 w-4 text-[#E5D3BC] mt-0.5 flex-shrink-0" />
-                <p className="text-xs">Latest News: {latestNews}</p>
-              </div>
-            )}
+      <div className="w-full max-w-[1800px] mx-auto px-4 py-8">
+        {/* Latest News */}
+        {latestNews && (
+          <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
+            <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
+            <p>Latest News: {latestNews}</p>
           </div>
-        </div>
+        )}
 
         {/* Filters Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Search className="h-4 w-4 text-gray-400" />
-            <h2 className="text-base font-semibold">Filters</h2>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Search className="h-5 w-5 text-gray-400" />
+              Filters
+            </h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Province</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Provinces</label>
               <MultiSelect
                 value={selectedProvinces}
                 onChange={setSelectedProvinces}
                 options={filterOptions.provinces}
-                placeholder="Province"
-                showAll={true}
+                placeholder="Select provinces..."
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Cities</label>
               <MultiSelect
                 value={selectedCities}
                 onChange={setSelectedCities}
                 options={filterOptions.cities}
-                placeholder="City"
-                showAll={true}
+                placeholder="Select cities..."
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Firm</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Firms</label>
               <MultiSelect
                 value={selectedFirms}
                 onChange={setSelectedFirms}
                 options={filterOptions.firms}
-                placeholder="Firm"
-                showAll={true}
+                placeholder="Select firms..."
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Branch</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Branches</label>
               <MultiSelect
                 value={selectedBranches}
                 onChange={setSelectedBranches}
                 options={filterOptions.branches}
-                placeholder="Branch"
-                showAll={true}
+                placeholder="Select branches..."
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Team</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Teams</label>
               <MultiSelect
                 value={selectedTeams}
                 onChange={setSelectedTeams}
                 options={filterOptions.teams}
-                placeholder="Team"
-                showAll={true}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Report List</label>
-              <MultiSelect
-                value={[]}
-                onChange={() => {}}
-                options={[]}
-                placeholder="Report List"
-                showAll={true}
+                placeholder="Select teams..."
               />
             </div>
           </div>
 
           <div className="flex justify-between items-center">
-            <div className="text-xs text-gray-500">
-              Active filters: {getActiveFiltersCount() || 'None'}
+            <div className="text-sm text-gray-500">
+              Active filters: {[
+                ...selectedProvinces.map(p => `Province: ${p}`),
+                ...selectedCities.map(c => `City: ${c}`),
+                ...selectedFirms.map(f => `Firm: ${f}`),
+                ...selectedBranches.map(b => `Branch: ${b}`),
+                ...selectedTeams.map(t => `Team: ${t}`)
+              ].length || 'None'}
             </div>
             
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={resetFilters}>
+              <Button variant="outline" onClick={resetFilters}>
                 Reset Filters
               </Button>
               <Button 
-                size="sm"
                 className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
                 onClick={applyFilters}
                 disabled={loadingAdvisors}
               >
-                Apply Filters
+                {loadingAdvisors ? 'Loading...' : 'Apply Filters'}
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Search Bar - Compact */}
-        <div className="relative max-w-sm mb-4">
+        {/* Search Bar */}
+        <div className="relative flex-1 max-w-md mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             type="text"
             placeholder="Search by name..."
             value={searchQuery}
             onChange={handleSearch}
-            className="pl-10 h-9"
+            className="pl-10"
           />
         </div>
 
         {/* Results Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(100vh - 320px)' }}>
+          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(13 * 65px + 48px)' }}>
             <table className="w-full table-fixed border-collapse min-w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -749,48 +721,38 @@ const Dashboard = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {advisors.map((advisor) => (
-                  
-                  <tr 
-                    key={advisor.id} 
-                    className="hover:bg-gray-50 cursor-pointer" 
-                    style={{ minHeight: '50px' }}
-                    onClick={() => handleAdvisorClick(advisor)}
-                  >
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                  <tr key={advisor.id} className="hover:bg-gray-50" style={{ minHeight: '65px' }}>
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.firstName}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.lastName}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.teamName}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.title}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.firm}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.branch}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.city}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 break-words">
+                    <td className="px-3 py-4 text-sm text-gray-900 break-words">
                       {advisor.province}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-500 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                    <td className="px-3 py-4 text-sm text-gray-500 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:text-[#E5D3BC] h-8 w-8 p-0"
+                          className="hover:text-[#E5D3BC]"
                           title="Add to Favorites"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Add to favorites logic
-                          }}
                         >
                           <Heart className="h-4 w-4" />
                         </Button>
@@ -798,12 +760,9 @@ const Dashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:text-[#E5D3BC] h-8 w-8 p-0"
+                            className="hover:text-[#E5D3BC]"
                             title="Send Email"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.location.href = `mailto:${advisor.email}`;
-                            }}
+                            onClick={() => window.location.href = `mailto:${advisor.email}`}
                           >
                             <Mail className="h-4 w-4" />
                           </Button>
@@ -812,12 +771,9 @@ const Dashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:text-[#E5D3BC] h-8 w-8 p-0"
+                            className="hover:text-[#E5D3BC]"
                             title="Visit Website"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(advisor.websiteUrl, '_blank');
-                            }}
+                            onClick={() => window.open(advisor.websiteUrl, '_blank')}
                           >
                             <Globe className="h-4 w-4" />
                           </Button>
@@ -826,12 +782,9 @@ const Dashboard = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:text-[#E5D3BC] h-8 w-8 p-0"
+                            className="hover:text-[#E5D3BC]"
                             title="View LinkedIn Profile"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(advisor.linkedinUrl, '_blank');
-                            }}
+                            onClick={() => window.open(advisor.linkedinUrl, '_blank')}
                           >
                             <Linkedin className="h-4 w-4" />
                           </Button>
@@ -839,12 +792,8 @@ const Dashboard = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:text-red-500 h-8 w-8 p-0"
+                          className="hover:text-red-500"
                           title="Report Issue"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Report issue logic
-                          }}
                         >
                           <AlertTriangle className="h-4 w-4" />
                         </Button>
@@ -856,12 +805,16 @@ const Dashboard = () => {
             </table>
           </div>
 
-          <div className="py-2 px-4 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
+          <div className="py-3 px-6 bg-gray-50 border-t border-gray-200 text-sm text-gray-500">
             Total Advisors: {totalAdvisors}
             {loadingAdvisors && <span className="ml-2">(Loading...)</span>}
           </div>
           
-          <div ref={ref} className="opacity-0 h-0" />
+          {hasMore && !loadingAdvisors && (
+            <div ref={ref} className="py-4 text-center text-gray-500">
+              Loading more advisors...
+            </div>
+          )}
         </div>
       </div>
     </div>
