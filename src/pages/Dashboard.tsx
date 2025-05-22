@@ -99,30 +99,22 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
     onChange(value.filter(v => v !== option));
   };
 
-  const handleClear = (e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onChange([]);
   };
 
-  const handleSelectAll = (e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
+  const handleSelectAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onChange([...options]);
   };
 
-  // Handle option click - prevent dropdown from closing
-  const handleOptionClick = (option: string, e: React.MouseEvent) => {
+  // Handle option click with improved event stopping
+  const handleOptionClick = (e: React.MouseEvent, option: string) => {
     e.preventDefault();
     e.stopPropagation();
     handleToggle(option);
-  };
-
-  // Handle checkbox change - prevent dropdown from closing
-  const handleCheckboxChange = (option: string) => {
-    handleToggle(option);
+    // Critical: do NOT call setIsOpen(false) here
   };
 
   const allSelected = options.length > 0 && value.length === options.length;
@@ -149,10 +141,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                 {item}
                 <X
                   className="ml-1 h-3 w-3 cursor-pointer hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemove(item);
-                  }}
+                  onClick={(e) => handleRemove(item, e)}
                 />
               </Badge>
             ))
@@ -167,10 +156,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
           {value.length > 0 && (
             <X
               className="h-4 w-4 cursor-pointer hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClear();
-              }}
+              onClick={(e) => handleClear(e)}
             />
           )}
           <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -189,12 +175,14 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                   <button
                     className="hover:text-blue-600 cursor-pointer"
                     onClick={handleSelectAll}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
                   >
                     Select All
                   </button>
                   <button
                     className="hover:text-red-600 cursor-pointer"
                     onClick={handleClear}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
                   >
                     Clear All
                   </button>
@@ -205,12 +193,12 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                   <div
                     key={option}
                     className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
-                    onClick={(e) => handleOptionClick(option, e)}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss
+                    onClick={(e) => handleOptionClick(e, option)}
+                    onMouseDown={(e) => e.preventDefault()} // Prevent focus loss and dropdown close
                   >
                     <Checkbox
                       checked={value.includes(option)}
-                      onCheckedChange={() => handleCheckboxChange(option)}
+                      onCheckedChange={() => handleToggle(option)}
                       onClick={(e) => e.stopPropagation()} // Prevent double toggle
                     />
                     <span className="text-sm">{option}</span>
