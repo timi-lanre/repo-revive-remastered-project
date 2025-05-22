@@ -1,4 +1,5 @@
-import { supabase, checkSupabaseConnection } from '@/lib/supabase';
+
+import { supabase, checkSupabaseConnection, isSessionValid } from '@/lib/supabase';
 
 export const getCurrentUser = async () => {
   try {
@@ -6,6 +7,13 @@ export const getCurrentUser = async () => {
     const isConnected = await checkSupabaseConnection();
     if (!isConnected) {
       throw new Error('Unable to connect to the authentication service. Please check your internet connection and try again.');
+    }
+
+    // Check if session is valid
+    const validSession = await isSessionValid();
+    if (!validSession) {
+      console.log("Session is invalid or expired");
+      return null;
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -18,7 +26,10 @@ export const getCurrentUser = async () => {
       throw new Error(`Authentication error: ${authError.message}`);
     }
     
-    if (!user) return null;
+    if (!user) {
+      console.log("No user found in auth state");
+      return null;
+    }
 
     try {
       // Get user profile with specific columns
@@ -41,6 +52,8 @@ export const getCurrentUser = async () => {
         throw new Error('User profile not found. Please contact support.');
       }
 
+      console.log("User role from profile:", profile.role);
+      
       return {
         ...user,
         ...profile
@@ -62,7 +75,9 @@ export const isAuthenticated = async (): Promise<boolean> => {
       console.error('Session check error:', error);
       return false;
     }
-    return !!session;
+    const isValid = !!session;
+    console.log("Authentication check result:", isValid);
+    return isValid;
   } catch (error) {
     console.error('Authentication check failed:', error);
     return false;
@@ -71,17 +86,30 @@ export const isAuthenticated = async (): Promise<boolean> => {
 
 export const isAdmin = async (): Promise<boolean> => {
   try {
+    console.log("Checking admin status...");
+    
     // First check if we can connect to Supabase
     const isConnected = await checkSupabaseConnection();
     if (!isConnected) {
       throw new Error('Unable to connect to the authentication service. Please check your internet connection and try again.');
     }
 
+    // Check if session is valid
+    const validSession = await isSessionValid();
+    if (!validSession) {
+      console.log("Session is invalid, user cannot be admin");
+      return false;
+    }
+
     const user = await getCurrentUser();
     if (!user) {
-      throw new Error('No user found. Please sign in again.');
+      console.log("No user found, cannot be admin");
+      return false;
     }
-    return user?.role === 'admin';
+    
+    const isUserAdmin = user?.role === 'admin';
+    console.log("Admin status check result:", isUserAdmin);
+    return isUserAdmin;
   } catch (error) {
     console.error("Error checking admin status:", error);
     if (error instanceof Error) {

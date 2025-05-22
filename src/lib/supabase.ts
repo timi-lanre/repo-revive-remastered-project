@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -35,24 +36,33 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Test the connection and provide better error messages
-supabase.auth.onAuthStateChange((event, session) => {
-  console.log('Supabase auth event:', event);
-  if (!session && event === 'SIGNED_OUT') {
-    console.log('User signed out or session expired');
-  }
-});
-
 // Export a function to check connection status
 export const checkSupabaseConnection = async () => {
   try {
     const { error } = await supabase.from('user_profiles').select('id').limit(1);
     if (error) {
+      console.error("Connection test failed:", error.message);
       throw error;
     }
+    console.log("Supabase connection test successful");
     return true;
   } catch (error) {
     console.error('Supabase connection test failed:', error);
+    return false;
+  }
+};
+
+// Check if the current user is authenticated
+export const isSessionValid = async () => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error("Session check failed:", error.message);
+      return false;
+    }
+    return !!data.session;
+  } catch (error) {
+    console.error("Session check error:", error);
     return false;
   }
 };

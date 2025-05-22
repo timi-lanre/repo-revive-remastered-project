@@ -10,6 +10,7 @@ import { authService } from "@/services/auth";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import FormErrorAlert from '@/components/form/FormErrorAlert';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { isSessionValid } from '@/lib/supabase';
 
 const CreateUserForm = () => {
   const [firstName, setFirstName] = useState('');
@@ -39,6 +40,13 @@ const CreateUserForm = () => {
       return;
     }
 
+    // First check if the user session is still valid
+    const sessionValid = await isSessionValid();
+    if (!sessionValid) {
+      setError("Your session has expired. Please log in again.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -48,7 +56,7 @@ const CreateUserForm = () => {
       
       if (result.success) {
         setSuccess(true);
-        setResultMessage("User created successfully!");
+        setResultMessage(result.message || "User created successfully!");
         
         toast({
           title: "Success",
@@ -60,8 +68,15 @@ const CreateUserForm = () => {
         setLastName('');
         setEmail('');
         
-        // Trigger a page refresh or emit an event to refresh the user list
+        // Trigger event to refresh the user list
+        console.log("Dispatching userCreated event");
         window.dispatchEvent(new CustomEvent('userCreated'));
+        
+        // Force a refresh of the users list in Admin component
+        setTimeout(() => {
+          console.log("Triggering delayed refresh after user creation");
+          window.dispatchEvent(new CustomEvent('userCreated'));
+        }, 2000); // Add a delayed second refresh for edge cases
       }
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -75,6 +90,10 @@ const CreateUserForm = () => {
           errorMessage = "Please enter a valid email address.";
         } else if (error.message.includes('Network')) {
           errorMessage = "Network error. Please check your connection and try again.";
+        } else if (error.message.includes('session') || error.message.includes('expired')) {
+          errorMessage = "Your session has expired. Please log in again.";
+          // Force page reload to go through auth check again
+          window.location.href = "/login";
         } else {
           errorMessage = error.message;
         }

@@ -39,7 +39,9 @@ const Admin = () => {
 
   const loadUsers = async () => {
     try {
-      // Get all user profiles
+      console.log("Loading user profiles...");
+      
+      // Get all user profiles - use a more direct query
       const { data: profiles, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -47,13 +49,27 @@ const Admin = () => {
         
       if (profileError) {
         console.error("Error loading profiles:", profileError);
+        // Check if it's a permission error (most common with RLS)
+        if (profileError.code === '42501' || profileError.message.includes('permission denied')) {
+          console.log("Permission denied error detected. Checking admin status...");
+          const adminCheck = await authService.isAdmin();
+          console.log("Current user admin status:", adminCheck);
+          
+          if (!adminCheck) {
+            throw new Error("Your admin session has expired. Please log in again.");
+          }
+        }
         throw profileError;
       }
 
       if (!profiles) {
-        throw new Error("No profiles found");
+        console.log("No profiles found in the database");
+        setAllUsers([]);
+        return;
       }
 
+      console.log(`Found ${profiles.length} user profiles`);
+      
       const formattedUsers = profiles.map(profile => ({
         id: profile.user_id,
         email: profile.email || 'No email',
@@ -66,10 +82,25 @@ const Admin = () => {
 
       setAllUsers(formattedUsers);
       setLoadingError(null);
+      console.log("Users loaded successfully:", formattedUsers.length);
       
     } catch (error: any) {
       console.error("Error loading users:", error);
       setLoadingError(error.message || "Failed to load users");
+      
+      // Special handling for session expiration
+      if (error.message.includes('expired') || error.message.includes('log in again')) {
+        toast({
+          title: "Session Expired",
+          description: "Your admin session has expired. Please log in again.",
+          variant: "destructive"
+        });
+        // Force logout and redirect to login
+        await authService.signOut();
+        navigate("/login");
+        return;
+      }
+      
       toast({
         title: "Error",
         description: "Failed to load users. Please try refreshing.",
@@ -157,16 +188,21 @@ const Admin = () => {
     const checkAuth = async () => {
       setIsLoading(true);
       try {
+        console.log("Checking authentication status...");
         const authenticated = await authService.isAuthenticated();
         if (!authenticated) {
+          console.log("User not authenticated, redirecting to login");
           navigate("/login");
           return;
         }
         
+        console.log("User is authenticated, checking admin status...");
         const adminStatus = await authService.isAdmin();
+        console.log("Admin status:", adminStatus);
         setIsAdmin(adminStatus);
         
         if (!adminStatus) {
+          console.log("User is not an admin, redirecting to dashboard");
           toast({
             title: "Access Denied",
             description: "You don't have permission to access this page.",
@@ -176,6 +212,7 @@ const Admin = () => {
           return;
         }
         
+        console.log("User is admin, loading users...");
         await loadUsers();
       } catch (error: any) {
         console.error("Error checking authentication:", error);
@@ -193,6 +230,7 @@ const Admin = () => {
     
     checkAuth();
     
+    // Event listener for user creation
     const handleUserCreated = () => {
       console.log("User created event detected, refreshing list");
       refreshUsers();
@@ -200,10 +238,21 @@ const Admin = () => {
     
     window.addEventListener('userCreated', handleUserCreated);
     
+    // Also set up a periodic refresh for the admin page
+    const refreshInterval = setInterval(() => {
+      if (activeTab === "all" && !isRefreshing) {
+        console.log("Auto-refreshing user list");
+        loadUsers().catch(error => {
+          console.error("Error in auto-refresh:", error);
+        });
+      }
+    }, 60000); // Refresh every minute
+    
     return () => {
       window.removeEventListener('userCreated', handleUserCreated);
+      clearInterval(refreshInterval);
     };
-  }, [navigate]);
+  }, [navigate, activeTab, isRefreshing]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -271,7 +320,12 @@ const Admin = () => {
         {loadingError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
             <p className="font-medium">Error loading users: {loadingError}</p>
-            <p className="text-sm mt-1">Try using the refresh button or reload the page.</p>
+            <p className="text-sm mt-1">
+              {loadingError.includes('expired') ? 
+                'Your session has expired. Please try logging in again.' :
+                'Try using the refresh button or reload the page.'
+              }
+            </p>
           </div>
         )}
         
