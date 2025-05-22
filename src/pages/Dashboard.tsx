@@ -387,149 +387,158 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Advisors Table */}
+        {/* Advisors Table with frozen header */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('firstName')}
-                  >
-                    <div className="flex items-center gap-1">
-                      First Name
-                      {sortColumn === 'firstName' && (
-                        <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('lastName')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Last Name
-                      {sortColumn === 'lastName' && (
-                        <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSort('teamName')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Team Name
-                      {sortColumn === 'teamName' && (
-                        <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Firm
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Branch
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    City
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Province
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {advisors.map((advisor) => (
-                  <tr key={advisor.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.firstName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.lastName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.teamName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.title}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.firm}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.branch}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.city}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {advisor.province}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:text-[#E5D3BC]"
-                          title="Add to Favorites"
-                        >
-                          <Heart className="h-4 w-4" />
-                        </Button>
-                        {advisor.email && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:text-[#E5D3BC]"
-                            title="Send Email"
-                            onClick={() => window.location.href = `mailto:${advisor.email}`}
-                          >
-                            <Mail className="h-4 w-4" />
-                          </Button>
+          <div className="relative">
+            {/* Frozen Header */}
+            <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer bg-gray-50"
+                      onClick={() => handleSort('firstName')}
+                    >
+                      <div className="flex items-center gap-1">
+                        First Name
+                        {sortColumn === 'firstName' && (
+                          <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
                         )}
-                        {advisor.websiteUrl && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:text-[#E5D3BC]"
-                            title="Visit Website"
-                            onClick={() => window.open(advisor.websiteUrl, '_blank')}
-                          >
-                            <Globe className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {advisor.linkedinUrl && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:text-[#E5D3BC]"
-                            title="View LinkedIn Profile"
-                            onClick={() => window.open(advisor.linkedinUrl, '_blank')}
-                          >
-                            <Linkedin className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:text-red-500"
-                          title="Report Issue"
-                        >
-                          <AlertTriangle className="h-4 w-4" />
-                        </Button>
                       </div>
-                    </td>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer bg-gray-50"
+                      onClick={() => handleSort('lastName')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Last Name
+                        {sortColumn === 'lastName' && (
+                          <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer bg-gray-50"
+                      onClick={() => handleSort('teamName')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Team Name
+                        {sortColumn === 'teamName' && (
+                          <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Title
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Firm
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Branch
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      City
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Province
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+              </table>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {advisors.map((advisor) => (
+                    <tr key={advisor.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.firstName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.lastName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.teamName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.title}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.firm}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.branch}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.city}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {advisor.province}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:text-[#E5D3BC]"
+                            title="Add to Favorites"
+                          >
+                            <Heart className="h-4 w-4" />
+                          </Button>
+                          {advisor.email && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:text-[#E5D3BC]"
+                              title="Send Email"
+                              onClick={() => window.location.href = `mailto:${advisor.email}`}
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {advisor.websiteUrl && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:text-[#E5D3BC]"
+                              title="Visit Website"
+                              onClick={() => window.open(advisor.websiteUrl, '_blank')}
+                            >
+                              <Globe className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {advisor.linkedinUrl && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:text-[#E5D3BC]"
+                              title="View LinkedIn Profile"
+                              onClick={() => window.open(advisor.linkedinUrl, '_blank')}
+                            >
+                              <Linkedin className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:text-red-500"
+                            title="Report Issue"
+                          >
+                            <AlertTriangle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           
           {/* Infinite scroll trigger */}
