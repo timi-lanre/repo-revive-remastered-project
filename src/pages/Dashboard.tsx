@@ -62,6 +62,13 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
     onChange([]);
   };
 
+  const handleSelectAll = () => {
+    onChange([...options]);
+  };
+
+  const allSelected = options.length > 0 && value.length === options.length;
+  const noneSelected = value.length === 0;
+
   return (
     <div className="relative">
       <div
@@ -73,8 +80,12 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
         <div className="flex flex-wrap gap-1 flex-1">
           {value.length === 0 ? (
             <span className="text-muted-foreground">{placeholder}</span>
+          ) : allSelected ? (
+            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+              All Selected ({options.length})
+            </Badge>
           ) : (
-            value.map((item) => (
+            value.slice(0, 2).map((item) => (
               <Badge key={item} variant="secondary" className="text-xs">
                 {item}
                 <X
@@ -86,6 +97,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
                 />
               </Badge>
             ))
+          )}
+          {value.length > 2 && !allSelected && (
+            <Badge variant="secondary" className="text-xs">
+              +{value.length - 2} more
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -107,19 +123,44 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ value, onChange, options, pla
           {options.length === 0 ? (
             <div className="py-2 px-3 text-sm text-muted-foreground">No options available</div>
           ) : (
-            options.map((option) => (
-              <div
-                key={option}
-                className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
-                onClick={() => handleToggle(option)}
-              >
-                <Checkbox
-                  checked={value.includes(option)}
-                  onChange={() => handleToggle(option)}
-                />
-                <span className="text-sm">{option}</span>
+            <>
+              {/* Select All / Clear All controls */}
+              <div className="border-b border-gray-200 mb-1 pb-1">
+                <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-600">
+                  <button
+                    className="hover:text-blue-600 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectAll();
+                    }}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    className="hover:text-red-600 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClear();
+                    }}
+                  >
+                    Clear All
+                  </button>
+                </div>
               </div>
-            ))
+              {options.map((option) => (
+                <div
+                  key={option}
+                  className="flex items-center space-x-2 rounded-sm px-2 py-2 hover:bg-accent cursor-pointer"
+                  onClick={() => handleToggle(option)}
+                >
+                  <Checkbox
+                    checked={value.includes(option)}
+                    onChange={() => handleToggle(option)}
+                  />
+                  <span className="text-sm">{option}</span>
+                </div>
+              ))}
+            </>
           )}
         </div>
       )}
@@ -142,7 +183,14 @@ const Dashboard = () => {
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Multi-select filter states
+  // Active filters (applied to data)
+  const [activeProvinces, setActiveProvinces] = useState<string[]>([]);
+  const [activeCities, setActiveCities] = useState<string[]>([]);
+  const [activeFirms, setActiveFirms] = useState<string[]>([]);
+  const [activeBranches, setActiveBranches] = useState<string[]>([]);
+  const [activeTeams, setActiveTeams] = useState<string[]>([]);
+
+  // Pending filters (not yet applied)
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
@@ -158,7 +206,7 @@ const Dashboard = () => {
     teams: []
   });
 
-  // Filtered options based on current selections
+  // Filtered options based on current selections (for cascading)
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     provinces: [],
     cities: [],
@@ -197,12 +245,12 @@ const Dashboard = () => {
     }
   };
 
-  // Update cascading filter options based on current selections
+  // Update cascading filter options based on pending selections (not active ones)
   const updateCascadingFilters = async () => {
     try {
       let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
-      // Apply current filters to determine what options should be available
+      // Apply pending filters to determine what options should be available
       if (selectedProvinces.length > 0) {
         query = query.in('province', selectedProvinces);
       }
@@ -296,12 +344,12 @@ const Dashboard = () => {
         query = query.or(`first_name.ilike.%${searchTerm.trim()}%,last_name.ilike.%${searchTerm.trim()}%`);
       }
 
-      // Apply multi-select filters
-      if (selectedProvinces.length > 0) query = query.in('province', selectedProvinces);
-      if (selectedCities.length > 0) query = query.in('city', selectedCities);
-      if (selectedFirms.length > 0) query = query.in('firm', selectedFirms);
-      if (selectedBranches.length > 0) query = query.in('branch', selectedBranches);
-      if (selectedTeams.length > 0) query = query.in('team_name', selectedTeams);
+      // Apply ACTIVE filters (not pending ones)
+      if (activeProvinces.length > 0) query = query.in('province', activeProvinces);
+      if (activeCities.length > 0) query = query.in('city', activeCities);
+      if (activeFirms.length > 0) query = query.in('firm', activeFirms);
+      if (activeBranches.length > 0) query = query.in('branch', activeBranches);
+      if (activeTeams.length > 0) query = query.in('team_name', activeTeams);
 
       // Apply sorting
       const columnMap: Record<string, string> = {
@@ -365,7 +413,7 @@ const Dashboard = () => {
       }
       loadAdvisors(0, term, true);
     }, 300),
-    [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]
+    [activeProvinces, activeCities, activeFirms, activeBranches, activeTeams, sortColumn, sortDirection]
   );
 
   // Handle infinite scroll
@@ -377,27 +425,12 @@ const Dashboard = () => {
     }
   }, [inView, hasMore, loadingAdvisors, advisors.length, page, searchQuery]);
 
-  // Update cascading filters when any filter changes
+  // Update cascading filters when pending selections change
   useEffect(() => {
     if (allFilterOptions.provinces.length > 0) {
       updateCascadingFilters();
     }
   }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, allFilterOptions]);
-
-  // Reload advisors when filters change
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!loadingAdvisors && allFilterOptions.provinces.length > 0) {
-        setPage(0);
-        if (tableContainerRef.current) {
-          tableContainerRef.current.scrollTop = 0;
-        }
-        loadAdvisors(0, searchQuery, true);
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams, sortColumn, sortDirection]);
 
   // Initial load
   useEffect(() => {
@@ -458,11 +491,17 @@ const Dashboard = () => {
   };
 
   const resetFilters = async () => {
+    // Reset both pending and active filters
     setSelectedProvinces([]);
     setSelectedCities([]);
     setSelectedFirms([]);
     setSelectedBranches([]);
     setSelectedTeams([]);
+    setActiveProvinces([]);
+    setActiveCities([]);
+    setActiveFirms([]);
+    setActiveBranches([]);
+    setActiveTeams([]);
     setSearchQuery("");
     setSortColumn("firstName");
     setSortDirection("asc");
@@ -479,16 +518,18 @@ const Dashboard = () => {
     await loadAdvisors(0, "", true);
   };
 
-  const handleSort = async (column: string) => {
+  const handleSort = (column: string) => {
     if (column === 'actions' || loadingAdvisors) return;
     
     let newSortDirection: "asc" | "desc" = "asc";
+    let newSortColumn = column;
     
     if (sortColumn === column) {
       newSortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     }
     
-    setSortColumn(column);
+    // Update state synchronously
+    setSortColumn(newSortColumn);
     setSortDirection(newSortDirection);
     setPage(0);
     
@@ -496,16 +537,175 @@ const Dashboard = () => {
       tableContainerRef.current.scrollTop = 0;
     }
     
-    // Force reload with new sort
-    await loadAdvisors(0, searchQuery, true);
+    // Use the new values directly instead of state
+    setTimeout(() => {
+      loadAdvisorsWithSort(newSortColumn, newSortDirection);
+    }, 0);
+  };
+
+  const loadAdvisorsWithSort = async (newSortColumn: string, newSortDirection: "asc" | "desc") => {
+    try {
+      setLoadingAdvisors(true);
+      
+      let query = supabase
+        .from('advisors')
+        .select('*', { count: 'exact' });
+
+      // Apply search filter
+      if (searchQuery.trim()) {
+        query = query.or(`first_name.ilike.%${searchQuery.trim()}%,last_name.ilike.%${searchQuery.trim()}%`);
+      }
+
+      // Apply ACTIVE filters
+      if (activeProvinces.length > 0) query = query.in('province', activeProvinces);
+      if (activeCities.length > 0) query = query.in('city', activeCities);
+      if (activeFirms.length > 0) query = query.in('firm', activeFirms);
+      if (activeBranches.length > 0) query = query.in('branch', activeBranches);
+      if (activeTeams.length > 0) query = query.in('team_name', activeTeams);
+
+      // Apply sorting with new values
+      const columnMap: Record<string, string> = {
+        firstName: 'first_name',
+        lastName: 'last_name',
+        teamName: 'team_name',
+        title: 'title',
+        firm: 'firm',
+        branch: 'branch',
+        city: 'city',
+        province: 'province'
+      };
+
+      const dbColumn = columnMap[newSortColumn] || 'first_name';
+      query = query.order(dbColumn, { 
+        ascending: newSortDirection === 'asc', 
+        nullsFirst: newSortDirection === 'desc' 
+      });
+
+      const { data, count, error } = await query
+        .range(0, ITEMS_PER_PAGE - 1);
+
+      if (error) throw error;
+
+      const formattedData = data.map(advisor => ({
+        id: advisor.id,
+        firstName: advisor.first_name || '',
+        lastName: advisor.last_name || '',
+        teamName: advisor.team_name || '',
+        title: advisor.title || '',
+        firm: advisor.firm || '',
+        branch: advisor.branch || '',
+        city: advisor.city || '',
+        province: advisor.province || '',
+        email: advisor.email || '',
+        websiteUrl: advisor.website_url || '',
+        linkedinUrl: advisor.linkedin_url || ''
+      }));
+
+      setAdvisors(formattedData);
+      setTotalAdvisors(count || 0);
+      setHasMore((count || 0) > ITEMS_PER_PAGE);
+    } catch (error) {
+      console.error("Error loading advisors with sort:", error);
+    } finally {
+      setLoadingAdvisors(false);
+    }
   };
 
   const applyFilters = async () => {
+    // Move pending filters to active filters
+    setActiveProvinces([...selectedProvinces]);
+    setActiveCities([...selectedCities]);
+    setActiveFirms([...selectedFirms]);
+    setActiveBranches([...selectedBranches]);
+    setActiveTeams([...selectedTeams]);
+    
     setPage(0);
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTop = 0;
     }
-    await loadAdvisors(0, searchQuery, true);
+    
+    // Load data with the new active filters
+    setTimeout(() => {
+      loadAdvisorsWithNewFilters(selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams);
+    }, 0);
+  };
+
+  const loadAdvisorsWithNewFilters = async (provinces: string[], cities: string[], firms: string[], branches: string[], teams: string[]) => {
+    try {
+      setLoadingAdvisors(true);
+      
+      let query = supabase
+        .from('advisors')
+        .select('*', { count: 'exact' });
+
+      // Apply search filter
+      if (searchQuery.trim()) {
+        query = query.or(`first_name.ilike.%${searchQuery.trim()}%,last_name.ilike.%${searchQuery.trim()}%`);
+      }
+
+      // Apply new filters
+      if (provinces.length > 0) query = query.in('province', provinces);
+      if (cities.length > 0) query = query.in('city', cities);
+      if (firms.length > 0) query = query.in('firm', firms);
+      if (branches.length > 0) query = query.in('branch', branches);
+      if (teams.length > 0) query = query.in('team_name', teams);
+
+      // Apply sorting
+      const columnMap: Record<string, string> = {
+        firstName: 'first_name',
+        lastName: 'last_name',
+        teamName: 'team_name',
+        title: 'title',
+        firm: 'firm',
+        branch: 'branch',
+        city: 'city',
+        province: 'province'
+      };
+
+      const dbColumn = columnMap[sortColumn] || 'first_name';
+      query = query.order(dbColumn, { 
+        ascending: sortDirection === 'asc', 
+        nullsFirst: sortDirection === 'desc' 
+      });
+
+      const { data, count, error } = await query
+        .range(0, ITEMS_PER_PAGE - 1);
+
+      if (error) throw error;
+
+      const formattedData = data.map(advisor => ({
+        id: advisor.id,
+        firstName: advisor.first_name || '',
+        lastName: advisor.last_name || '',
+        teamName: advisor.team_name || '',
+        title: advisor.title || '',
+        firm: advisor.firm || '',
+        branch: advisor.branch || '',
+        city: advisor.city || '',
+        province: advisor.province || '',
+        email: advisor.email || '',
+        websiteUrl: advisor.website_url || '',
+        linkedinUrl: advisor.linkedin_url || ''
+      }));
+
+      setAdvisors(formattedData);
+      setTotalAdvisors(count || 0);
+      setHasMore((count || 0) > ITEMS_PER_PAGE);
+    } catch (error) {
+      console.error("Error loading advisors with new filters:", error);
+    } finally {
+      setLoadingAdvisors(false);
+    }
+  };
+
+  const getActiveFilterCount = () => {
+    return activeProvinces.length + activeCities.length + activeFirms.length + 
+           activeBranches.length + activeTeams.length;
+  };
+
+  const hasUnappliedChanges = () => {
+    return JSON.stringify([activeProvinces, activeCities, activeFirms, activeBranches, activeTeams]) !==
+           JSON.stringify([selectedProvinces, selectedCities, selectedFirms, selectedBranches, selectedTeams]);
   };
 
   if (isLoading) {
@@ -560,8 +760,11 @@ const Dashboard = () => {
             </Button>
           </div>
         </div>
+      </div>
 
-        <div className="mt-8">
+      {/* Welcome Section - Moved outside header */}
+      <div className="w-full max-w-[1800px] mx-auto px-4 py-4">
+        <div className="mb-4">
           <h1 className="text-2xl font-bold text-[#111827]">
             Welcome back, {userName}
           </h1>
@@ -569,30 +772,35 @@ const Dashboard = () => {
             Last login: {lastLogin || "Loading..."}
           </p>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="w-full max-w-[1800px] mx-auto px-4 py-8">
         {/* Latest News */}
         {latestNews && (
-          <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
+          <div className="mb-6 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
             <Info className="h-5 w-5 text-[#E5D3BC] mt-0.5" />
             <p>Latest News: {latestNews}</p>
           </div>
         )}
 
-        {/* Filters Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
+        {/* Compact Filters Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Search className="h-5 w-5 text-gray-400" />
               Filters
             </h2>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              Active: {getActiveFilterCount()}
+              {hasUnappliedChanges() && (
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                  Changes Pending
+                </Badge>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Provinces</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Provinces</label>
               <MultiSelect
                 value={selectedProvinces}
                 onChange={setSelectedProvinces}
@@ -602,7 +810,7 @@ const Dashboard = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Cities</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cities</label>
               <MultiSelect
                 value={selectedCities}
                 onChange={setSelectedCities}
@@ -612,7 +820,7 @@ const Dashboard = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Firms</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Firms</label>
               <MultiSelect
                 value={selectedFirms}
                 onChange={setSelectedFirms}
@@ -622,7 +830,7 @@ const Dashboard = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Branches</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Branches</label>
               <MultiSelect
                 value={selectedBranches}
                 onChange={setSelectedBranches}
@@ -632,7 +840,7 @@ const Dashboard = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Teams</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Teams</label>
               <MultiSelect
                 value={selectedTeams}
                 onChange={setSelectedTeams}
@@ -643,24 +851,25 @@ const Dashboard = () => {
           </div>
 
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Active filters: {[
-                ...selectedProvinces.map(p => `Province: ${p}`),
-                ...selectedCities.map(c => `City: ${c}`),
-                ...selectedFirms.map(f => `Firm: ${f}`),
-                ...selectedBranches.map(b => `Branch: ${b}`),
-                ...selectedTeams.map(t => `Team: ${t}`)
-              ].length || 'None'}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search by name..."
+                value={searchQuery}
+                onChange={handleSearch}
+                className="pl-10"
+              />
             </div>
             
             <div className="flex gap-2">
               <Button variant="outline" onClick={resetFilters}>
-                Reset Filters
+                Reset All
               </Button>
               <Button 
-                className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]"
+                className={`${hasUnappliedChanges() ? 'bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]' : 'bg-gray-300 text-gray-600'}`}
                 onClick={applyFilters}
-                disabled={loadingAdvisors}
+                disabled={loadingAdvisors || !hasUnappliedChanges()}
               >
                 {loadingAdvisors ? 'Loading...' : 'Apply Filters'}
               </Button>
@@ -668,21 +877,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search by name..."
-            value={searchQuery}
-            onChange={handleSearch}
-            className="pl-10"
-          />
-        </div>
-
         {/* Results Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(13 * 65px + 48px)' }}>
+          <div ref={tableContainerRef} className="w-full overflow-x-auto" style={{ height: 'calc(15 * 65px + 48px)' }}>
             <table className="w-full table-fixed border-collapse min-w-full">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
