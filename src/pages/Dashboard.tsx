@@ -76,14 +76,13 @@ const Dashboard = () => {
       if (selectedFirm !== "all") query = query.eq('firm', selectedFirm);
       if (selectedTeam !== "all") query = query.eq('team_name', selectedTeam);
 
-      // Map frontend column names to database column names for sorting
+      // Add sorting
       const columnMap: Record<string, string> = {
         firstName: 'first_name',
         lastName: 'last_name',
         teamName: 'team_name',
       };
 
-      // Add sorting using the correct column names
       const dbColumn = columnMap[sortColumn] || sortColumn;
       query = query.order(dbColumn, { ascending: sortDirection === 'asc' });
 
@@ -229,39 +228,60 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f8fafc]">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <img
-                src="/lovable-uploads/8af3a359-89c1-4bf8-a9ea-f2255c283985.png"
-                alt="Advisor Connect"
-                className="h-8 w-auto"
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={handleLogout}>
-                Logout
-              </Button>
-            </div>
+      <div className="w-full px-4 sm:px-8 md:px-12 py-6 bg-gradient-to-r from-[#E5D3BC] to-[#e9d9c6] border-b border-black/5 shadow-sm">
+        <div className="flex justify-between items-center w-full">
+          <div className="flex items-center justify-center sm:justify-start w-full sm:w-auto">
+            <img
+              src="/lovable-uploads/8af3a359-89c1-4bf8-a9ea-f2255c283985.png"
+              alt="Advisor Connect"
+              width={268}
+              height={100}
+              className="object-contain"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-black/10
+                bg-white/20 text-black after:content-[''] after:absolute after:bottom-0 after:left-[10%] after:w-4/5 after:h-0.5 after:bg-black"
+            >
+              Home
+            </Button>
+            <Button
+              variant="ghost"
+              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-transparent
+                hover:bg-white/20 hover:border-black/10 hover:text-black hover:-translate-y-0.5 transition-all duration-300"
+              onClick={() => navigate("/about")}
+            >
+              About
+            </Button>
+            <Button
+              variant="ghost"
+              className="relative text-[#1E293B] font-semibold text-base px-3 py-1 rounded-lg border border-transparent
+                hover:bg-white/20 hover:border-black/10 hover:text-black hover:-translate-y-0.5 transition-all duration-300"
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
+        <div className="mt-8">
+          <h1 className="text-2xl font-bold text-[#111827]">
             Welcome back, {userName}
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-700">
             Last login: {lastLogin || "Loading..."}
           </p>
         </div>
+      </div>
 
+      {/* Main Content */}
+      <div className="max-w-[95%] mx-auto px-4 py-8">
         {/* Latest News */}
         {latestNews && (
           <div className="mb-8 flex items-start gap-3 text-gray-600 bg-[#E5D3BC]/10 p-4 rounded-lg border border-[#E5D3BC]">
@@ -271,26 +291,18 @@ const Dashboard = () => {
         )}
 
         {/* Filters Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Search className="h-5 w-5 text-gray-400" />
               Filters
             </h2>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={resetFilters}>
-                Reset Filters
-              </Button>
-              <Button className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
-                Apply Filters
-              </Button>
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <Select value={selectedProvince} onValueChange={setSelectedProvince}>
               <SelectTrigger>
-                <SelectValue placeholder="Province" />
+                <SelectValue placeholder="All Provinces" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Provinces</SelectItem>
@@ -309,7 +321,7 @@ const Dashboard = () => {
 
             <Select value={selectedCity} onValueChange={setSelectedCity}>
               <SelectTrigger>
-                <SelectValue placeholder="City" />
+                <SelectValue placeholder="All Cities" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Cities</SelectItem>
@@ -318,7 +330,7 @@ const Dashboard = () => {
 
             <Select value={selectedFirm} onValueChange={setSelectedFirm}>
               <SelectTrigger>
-                <SelectValue placeholder="Firm" />
+                <SelectValue placeholder="All Firms" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Firms</SelectItem>
@@ -327,7 +339,7 @@ const Dashboard = () => {
 
             <Select value={selectedTeam} onValueChange={setSelectedTeam}>
               <SelectTrigger>
-                <SelectValue placeholder="Team" />
+                <SelectValue placeholder="All Teams" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Teams</SelectItem>
@@ -336,7 +348,7 @@ const Dashboard = () => {
 
             <Select value={selectedFavoritesList} onValueChange={setSelectedFavoritesList}>
               <SelectTrigger>
-                <SelectValue placeholder="Favorites List" />
+                <SelectValue placeholder="All Lists" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Lists</SelectItem>
@@ -345,12 +357,21 @@ const Dashboard = () => {
 
             <Select value={selectedReportList} onValueChange={setSelectedReportList}>
               <SelectTrigger>
-                <SelectValue placeholder="Report List" />
+                <SelectValue placeholder="All Reports" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Reports</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={resetFilters}>
+              Reset Filters
+            </Button>
+            <Button className="bg-[#E5D3BC] text-black hover:bg-[#d6c3ac]">
+              Apply Filters
+            </Button>
           </div>
         </div>
 
@@ -518,7 +539,7 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 };
