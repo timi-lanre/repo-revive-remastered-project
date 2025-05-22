@@ -1,91 +1,36 @@
-import React, { useState } from "react";
-import { toast } from "@/components/ui/use-toast";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Form } from "@/components/ui/form";
-import { authService } from "@/services/auth";
-import SignupFormFields, { SignupFormValues } from "./SignupFormFields";
-import FormErrorAlert from "./FormErrorAlert";
-import SubmitButton from "./SubmitButton";
-import FormDisclaimer from "./FormDisclaimer";
 
-const signupSchema = z.object({
-  firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
-  lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
-  confirmPassword: z.string(),
-  acceptTerms: z.boolean().refine(val => val === true, {
-    message: "You must accept the terms and conditions",
-  }),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const SignupForm = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [signupError, setSignupError] = useState<string | null>(null);
-  
-  const form = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      acceptTerms: false,
-    },
-  });
-
-  const onSubmit = async (data: SignupFormValues) => {
-    setIsLoading(true);
-    setSignupError(null);
-    
-    try {
-      // Proceed with signup
-      await authService.signUp(data.email, data.password, data.firstName, data.lastName);
-      
-      toast({
-        title: "Account Request Submitted",
-        description: "Your account has been created and is pending admin approval.",
-      });
-      
-      // Reset the form after successful signup
-      form.reset();
-      
-    } catch (error: any) {
-      const errorMessage = error.message || "There was an error creating your account. Please try again.";
-      
-      setSignupError(errorMessage);
-      toast({
-        title: "Signup Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormErrorAlert error={signupError} />
-        
-        <SignupFormFields form={form} isLoading={isLoading} />
-        
-        <SubmitButton 
-          isLoading={isLoading} 
-          loadingText="Creating Account..." 
-          text="Create Account" 
-        />
+    <Card>
+      <CardHeader>
+        <CardTitle>Account Registration</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Registration Unavailable</AlertTitle>
+          <AlertDescription>
+            Self-registration is currently disabled. Please contact your administrator to create an account.
+          </AlertDescription>
+        </Alert>
 
-        <FormDisclaimer text="After signing up, your account will be reviewed by an administrator before activation." />
-      </form>
-    </Form>
+        <div className="text-center">
+          <p className="text-sm text-gray-500 mb-4">
+            If you already have an account, you can sign in below.
+          </p>
+          <Button asChild>
+            <Link to="/login">Go to Login</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

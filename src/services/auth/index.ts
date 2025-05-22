@@ -7,6 +7,7 @@ import {
   rejectUser,
   resetPassword,
   createUser,
+  signUp,
   UserStatus,
   type PendingUser
 } from './adminFunctions';
@@ -22,7 +23,8 @@ export const authService = {
   rejectUser,
   loginWithEmailPassword,
   resetPassword,
-  createUser
+  createUser,
+  signUp
 };
 
 // Re-export types
