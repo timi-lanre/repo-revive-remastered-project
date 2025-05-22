@@ -30,6 +30,13 @@ interface Advisor {
   linkedinUrl: string;
 }
 
+interface FilterOptions {
+  provinces: string[];
+  cities: string[];
+  firms: string[];
+  teams: string[];
+}
+
 const ITEMS_PER_PAGE = 50;
 
 const Dashboard = () => {
@@ -54,10 +61,57 @@ const Dashboard = () => {
   const [selectedFavoritesList, setSelectedFavoritesList] = useState<string>("all");
   const [selectedReportList, setSelectedReportList] = useState<string>("all");
 
+  // Filter options
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    provinces: [],
+    cities: [],
+    firms: [],
+    teams: []
+  });
+
   // Infinite scroll
   const { ref, inView } = useInView({
     threshold: 0,
   });
+
+  // Load filter options based on current selection
+  const loadFilterOptions = async () => {
+    try {
+      let query = supabase.from('advisors').select('province, city, firm, team_name');
+
+      if (selectedProvince !== "all") {
+        query = query.eq('province', selectedProvince);
+      }
+      if (selectedCity !== "all") {
+        query = query.eq('city', selectedCity);
+      }
+      if (selectedFirm !== "all") {
+        query = query.eq('firm', selectedFirm);
+      }
+      if (selectedTeam !== "all") {
+        query = query.eq('team_name', selectedTeam);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const options: FilterOptions = {
+        provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
+        cities: Array.from(new Set(data.map(d => d.city).filter(Boolean))).sort(),
+        firms: Array.from(new Set(data.map(d => d.firm).filter(Boolean))).sort(),
+        teams: Array.from(new Set(data.map(d => d.team_name).filter(Boolean))).sort()
+      };
+
+      setFilterOptions(options);
+    } catch (error) {
+      console.error("Error loading filter options:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadFilterOptions();
+  }, [selectedProvince, selectedCity, selectedFirm, selectedTeam]);
 
   const loadAdvisors = async (pageNumber: number, searchTerm: string = "") => {
     try {
@@ -81,6 +135,11 @@ const Dashboard = () => {
         firstName: 'first_name',
         lastName: 'last_name',
         teamName: 'team_name',
+        title: 'title',
+        firm: 'firm',
+        branch: 'branch',
+        city: 'city',
+        province: 'province'
       };
 
       const dbColumn = columnMap[sortColumn] || sortColumn;
@@ -168,6 +227,7 @@ const Dashboard = () => {
 
         // Load initial advisors
         await loadAdvisors(0);
+        await loadFilterOptions();
       } catch (error) {
         console.error("Error in dashboard:", error);
         navigate("/login");
@@ -206,6 +266,8 @@ const Dashboard = () => {
   };
 
   const handleSort = (column: string) => {
+    if (column === 'actions') return; // Skip sorting for actions column
+    
     if (sortColumn === column) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -214,6 +276,30 @@ const Dashboard = () => {
     }
     setPage(0);
     loadAdvisors(0, searchQuery);
+  };
+
+  const handleFilterChange = async (value: string, filterType: string) => {
+    // Reset dependent filters
+    switch (filterType) {
+      case 'province':
+        setSelectedProvince(value);
+        setSelectedCity('all');
+        break;
+      case 'city':
+        setSelectedCity(value);
+        break;
+      case 'firm':
+        setSelectedFirm(value);
+        setSelectedTeam('all');
+        break;
+      case 'team':
+        setSelectedTeam(value);
+        break;
+    }
+
+    // Reset pagination and reload data
+    setPage(0);
+    await loadAdvisors(0, searchQuery);
   };
 
   if (isLoading) {
@@ -300,49 +386,71 @@ const Dashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            <Select value={selectedProvince} onValueChange={setSelectedProvince}>
+            <Select 
+              value={selectedProvince} 
+              onValueChange={(value) => handleFilterChange(value, 'province')}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All Provinces" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Provinces</SelectItem>
-                <SelectItem value="AB">Alberta</SelectItem>
-                <SelectItem value="BC">British Columbia</SelectItem>
-                <SelectItem value="MB">Manitoba</SelectItem>
-                <SelectItem value="NB">New Brunswick</SelectItem>
-                <SelectItem value="NL">Newfoundland</SelectItem>
-                <SelectItem value="NS">Nova Scotia</SelectItem>
-                <SelectItem value="ON">Ontario</SelectItem>
-                <SelectItem value="PE">Prince Edward Island</SelectItem>
-                <SelectItem value="QC">Quebec</SelectItem>
-                <SelectItem value="SK">Saskatchewan</SelectItem>
+                {filterOptions.provinces.map((province) => (
+                  <SelectItem key={province} value={province}>
+                    {province}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            <Select value={selectedCity} onValueChange={setSelectedCity}>
+            <Select 
+              value={selectedCity} 
+              onValueChange={(value) => handleFilterChange(value, 'city')}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All Cities" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Cities</SelectItem>
+                {filterOptions.cities.map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            <Select value={selectedFirm} onValueChange={setSelectedFirm}>
+            <Select 
+              value={selectedFirm} 
+              onValueChange={(value) => handleFilterChange(value, 'firm')}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All Firms" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Firms</SelectItem>
+                {filterOptions.firms.map((firm) => (
+                  <SelectItem key={firm} value={firm}>
+                    {firm}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+            <Select 
+              value={selectedTeam} 
+              onValueChange={(value) => handleFilterChange(value, 'team')}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All Teams" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Teams</SelectItem>
+                {filterOptions.teams.map((team) => (
+                  <SelectItem key={team} value={team}>
+                    {team}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -387,73 +495,45 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Advisors Table with frozen header */}
+        {/* Advisors Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="relative">
-            {/* Frozen Header */}
-            <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer bg-gray-50"
-                      onClick={() => handleSort('firstName')}
-                    >
-                      <div className="flex items-center gap-1">
-                        First Name
-                        {sortColumn === 'firstName' && (
-                          <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer bg-gray-50"
-                      onClick={() => handleSort('lastName')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Last Name
-                        {sortColumn === 'lastName' && (
-                          <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer bg-gray-50"
-                      onClick={() => handleSort('teamName')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Team Name
-                        {sortColumn === 'teamName' && (
-                          <ChevronUp className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Title
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Firm
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Branch
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      City
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Province
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-
-            {/* Scrollable Content */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {[
+                      { key: 'firstName', label: 'First Name' },
+                      { key: 'lastName', label: 'Last Name' },
+                      { key: 'teamName', label: 'Team Name' },
+                      { key: 'title', label: 'Title' },
+                      { key: 'firm', label: 'Firm' },
+                      { key: 'branch', label: 'Branch' },
+                      { key: 'city', label: 'City' },
+                      { key: 'province', label: 'Province' },
+                      { key: 'actions', label: 'Actions' }
+                    ].map((column) => (
+                      <th
+                        key={column.key}
+                        onClick={() => handleSort(column.key)}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                          column.key !== 'actions' ? 'cursor-pointer hover:bg-gray-100' : ''
+                        } ${column.key === 'actions' ? 'text-right' : ''}`}
+                      >
+                        <div className="flex items-center gap-1">
+                          {column.label}
+                          {column.key !== 'actions' && sortColumn === column.key && (
+                            <ChevronUp
+                              className={`h-4 w-4 transition-transform ${
+                                sortDirection === 'desc' ? 'rotate-180' : ''
+                              }`}
+                            />
+                          )}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {advisors.map((advisor) => (
                     <tr key={advisor.id} className="hover:bg-gray-50">
