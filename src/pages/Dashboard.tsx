@@ -58,6 +58,7 @@ const Dashboard = () => {
   const [page, setPage] = useState(0);
   const [sortColumn, setSortColumn] = useState("firstName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [isLoadingFilters, setIsLoadingFilters] = useState(false);
 
   // Update state to handle multiple selections
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
@@ -128,7 +129,7 @@ const Dashboard = () => {
 
       if (error) throw error;
 
-      const formattedData = data.map(advisor => ({
+      const formattedData = data?.map(advisor => ({
         id: advisor.id,
         firstName: advisor.first_name,
         lastName: advisor.last_name,
@@ -141,7 +142,7 @@ const Dashboard = () => {
         email: advisor.email || '',
         websiteUrl: advisor.website_url || '',
         linkedinUrl: advisor.linkedin_url || ''
-      }));
+      })) || [];
 
       if (pageNumber === 0) {
         setAdvisors(formattedData);
@@ -158,6 +159,7 @@ const Dashboard = () => {
 
   const loadFilterOptions = async () => {
     try {
+      setIsLoadingFilters(true);
       let query = supabase.from('advisors').select('province, city, firm, branch, team_name');
 
       // Apply cascading filters
@@ -178,6 +180,11 @@ const Dashboard = () => {
 
       if (error) throw error;
 
+      if (!data) {
+        console.warn('No data returned from filter options query');
+        return;
+      }
+
       const options: FilterOptions = {
         provinces: Array.from(new Set(data.map(d => d.province).filter(Boolean))).sort(),
         cities: Array.from(new Set(data.map(d => d.city).filter(Boolean))).sort(),
@@ -189,6 +196,8 @@ const Dashboard = () => {
       setFilterOptions(options);
     } catch (error) {
       console.error("Error loading filter options:", error);
+    } finally {
+      setIsLoadingFilters(false);
     }
   };
 
